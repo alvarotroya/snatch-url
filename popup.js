@@ -1,30 +1,21 @@
 // Snatch URL - popup.js
 
+import {
+  parseUrl,
+  buildUrl,
+  setSegment,
+  deleteSegment,
+  setKey,
+  setValue,
+  deleteEntry,
+  addEntry,
+  clearEntries,
+} from './url-model.js';
+
 // --- State ---
-// state = { base: URL, segments: string[], entries: { key, value }[] }
+// state is the UrlModel from url-model.js: it holds the raw path and query
+// text, so an edit only rewrites the part it touches.
 let state = null;
-
-// --- URL helpers ---
-
-function parseUrl(url) {
-  try {
-    const u = new URL(url);
-    const segments = u.pathname.split('/').filter(s => s !== '');
-    const entries = [];
-    u.searchParams.forEach((value, key) => entries.push({ key, value }));
-    return { base: u, segments, entries };
-  } catch {
-    return null;
-  }
-}
-
-function buildUrl({ base, segments, entries }) {
-  const u = new URL(base.href);
-  u.pathname = segments.length ? '/' + segments.join('/') : '/';
-  u.search = '';
-  entries.forEach(({ key, value }) => u.searchParams.append(key, value));
-  return u.href;
-}
 
 // --- DOM helpers ---
 
@@ -35,6 +26,20 @@ function showError(msg) {
   el.textContent = msg;
   el.classList.remove('hidden');
   setTimeout(() => el.classList.add('hidden'), 3000);
+}
+
+/**
+ * Apply a model edit made from an input. A rejected edit (a blank key or
+ * segment) puts the old text back and shows why, so the URL is never
+ * navigated to something the model refused.
+ */
+function applyEdit(result, input, previousText) {
+  if (!result.ok) {
+    input.value = previousText;
+    showError(result.error);
+    return;
+  }
+  updateTabUrl(buildUrl(state));
 }
 
 // --- Render path ---
@@ -62,7 +67,7 @@ function renderPath() {
 
     const segEl = document.createElement('input');
     segEl.type = 'text';
-    segEl.value = decodeURIComponent(seg);
+    segEl.value = seg.text;
     segEl.className = 'param-value path-seg';
 
     const copyBtn = document.createElement('button');
@@ -77,17 +82,17 @@ function renderPath() {
 
     segEl.addEventListener('change', () => {
       const i = parseInt(li.dataset.idx, 10);
-      state.segments[i] = encodeURIComponent(segEl.value.trim());
-      updateTabUrl(buildUrl(state));
+      const previous = state.segments[i].text;
+      applyEdit(setSegment(state, i, segEl.value), segEl, previous);
     });
 
     copyBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(decodeURIComponent(seg))
+      navigator.clipboard.writeText(seg.text)
         .catch(() => showError('Clipboard access denied.'));
     });
 
     delBtn.addEventListener('click', () => {
-      state.segments.splice(idx, 1);
+      deleteSegment(state, idx);
       updateTabUrl(buildUrl(state));
       renderPath();
     });
@@ -137,13 +142,13 @@ function renderQuery() {
     delBtn.textContent = '✕';
 
     keyEl.addEventListener('change', () => {
-      state.entries[idx].key = keyEl.value.trim();
-      updateTabUrl(buildUrl(state));
+      const previous = state.entries[idx].key;
+      applyEdit(setKey(state, idx, keyEl.value), keyEl, previous);
     });
 
     valEl.addEventListener('change', () => {
-      state.entries[idx].value = valEl.value;
-      updateTabUrl(buildUrl(state));
+      const previous = state.entries[idx].value;
+      applyEdit(setValue(state, idx, valEl.value), valEl, previous);
     });
 
     copyBtn.addEventListener('click', () => {
@@ -151,7 +156,7 @@ function renderQuery() {
     });
 
     delBtn.addEventListener('click', () => {
-      state.entries.splice(idx, 1);
+      deleteEntry(state, idx);
       updateTabUrl(buildUrl(state));
       renderQuery();
     });
@@ -196,16 +201,14 @@ function loadCurrentTab() {
     };
 
     $('clear-btn').onclick = () => {
-      state.entries.length = 0;
+      clearEntries(state);
       updateTabUrl(buildUrl(state));
       renderQuery();
     };
 
     $('add-btn').onclick = () => {
-      const key = $('new-key').value.trim();
-      const value = $('new-value').value;
-      if (!key) { showError('Key cannot be empty.'); return; }
-      state.entries.push({ key, value });
+      const result = addEntry(state, $('new-key').value, $('new-value').value);
+      if (!result.ok) { showError(result.error); return; }
       updateTabUrl(buildUrl(state));
       renderQuery();
       $('new-key').value = '';
