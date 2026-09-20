@@ -1,8 +1,8 @@
 # Snatch URL
 
-A small Chrome extension that opens the current tab's URL as editable rows: one row
+A small browser extension that opens the current tab's URL as editable rows: one row
 per path segment, one row per query parameter. Change a row and the tab navigates to
-the rebuilt URL.
+the rebuilt URL. It runs in Chrome, Edge and Firefox from the same directory.
 
 It is a prototype, built to work out what the tool should really be. Expect rough
 edges, and expect the UI to change.
@@ -35,8 +35,9 @@ instead of being navigated to.
 Rebuilding preserves the parts you did not touch: `%20` stays `%20`, `a,b` stays
 `a,b`, a bare `debug` stays bare, and a trailing slash is kept.
 
-Because the popup drives the tab it was opened from, it cannot act on pages Chrome
-keeps extensions out of, such as `chrome://` pages and the Chrome Web Store.
+Because the popup drives the tab it was opened from, it cannot act on the pages a
+browser keeps extensions out of: `chrome://` pages and the Chrome Web Store, or
+`about:` pages and addons.mozilla.org in Firefox.
 
 ## Permissions
 
@@ -44,7 +45,13 @@ Only `activeTab`: the extension can read and change the URL of the tab you are o
 and only from the moment you click its icon. It has no access to your other tabs, no
 browsing history access, and no network access of its own.
 
-## Install (Chrome, unpacked)
+## Install
+
+One unpacked directory works in all three browsers: Chrome and Edge read the MV3
+manifest, and the `browser_specific_settings.gecko` block in it is what Firefox needs.
+Chrome and Edge ignore that block, so there is no build step and nothing to generate.
+
+### Chrome
 
 1. Clone or download this repository.
 2. Open `chrome://extensions/`.
@@ -55,11 +62,58 @@ browsing history access, and no network access of its own.
 After changing any file, press the reload button on the extension's card in
 `chrome://extensions/`.
 
+### Edge
+
+The same steps, at `edge://extensions/`: turn on **Developer mode**, click **Load
+unpacked**, pick this directory. Edge runs the Chrome package as-is.
+
+### Firefox
+
+Firefox will not keep an unsigned add-on installed, so it is loaded temporarily and
+goes away when you close the browser.
+
+1. Open `about:debugging#/runtime/this-firefox`.
+2. Click **Load Temporary Add-on…** and pick `manifest.json` in this directory.
+3. Pin **Snatch URL** to the toolbar from the extensions (puzzle piece) menu.
+
+`about:debugging` also has a **Reload** button, which is the equivalent of Chrome's.
+
+`web-ext` does the same thing from a terminal, and starts a throwaway profile with the
+add-on already loaded:
+
+```sh
+npx web-ext run --source-dir .
+```
+
+It is deliberately not a dependency of this repo — run it through `npx` when you want
+it.
+
+## Browser differences
+
+`strict_min_version` claims Firefox 115. What is actually exercised is the popup's
+`chrome.*` namespace, `action.default_popup`, `tabs.query`, `tabs.update` and
+`navigator.clipboard.writeText`; all of them behave the same in Chrome and Firefox,
+including the raw-encoding round trip. In particular Firefox resolves
+`navigator.clipboard.writeText` from the popup with no extra permission and no prompt,
+so the copy buttons need nothing Firefox-specific.
+
+What does differ is the install, not the extension: Chrome and Edge keep an unpacked
+extension across restarts, while Firefox drops a temporary add-on when it closes and
+gives it a fresh random `moz-extension://` origin every time it is loaded.
+
+`browser_specific_settings` costs Chrome nothing: it neither strips the key —
+`chrome.runtime.getManifest()` still returns it — nor warns about it, which is why one
+directory serves every browser and there is no `dist/` step.
+
+Verified on Chrome 151 and Firefox 140 ESR. Edge was not available on the machine this
+was checked on, so its instructions rest on it being the same Chromium extension stack,
+not on a run.
+
 ## Layout
 
 | File | What it is |
 | --- | --- |
-| `manifest.json` | MV3 manifest: the popup and the `activeTab` permission |
+| `manifest.json` | MV3 manifest: the popup, the `activeTab` permission, the Firefox add-on id |
 | `popup.html` | popup markup |
 | `popup.js` | reads the tab URL, renders the rows, navigates the tab |
 | `url-model.js` | the one place a URL is parsed and rebuilt |
