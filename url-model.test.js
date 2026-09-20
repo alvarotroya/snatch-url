@@ -1,0 +1,279 @@
+// Snatch URL - url-model.test.js
+//
+// Run with `npm test` (node --test, no dependencies).
+//
+// Every case the assessment report reproduced has a test here: trailing
+// slash, %20 vs +, bare flag, duplicate keys, %zz, blank key, blank segment,
+// and `@` in a segment.
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import {
+  parseUrl,
+  buildUrl,
+  setSegment,
+  deleteSegment,
+  setKey,
+  setValue,
+  deleteEntry,
+  addEntry,
+  clearEntries,
+  safeDecode,
+  BLANK_KEY,
+  BLANK_SEGMENT,
+} from './url-model.js';
+
+// The exact URL the report drove the extension with.
+const REPORT_URL =
+  'http://127.0.0.1:8765/docs/guide/?q=hello%20world&tags=a,b&redirect=https://x.io/cb&debug&tag=a&tag=b#section-2';
+
+function edit(url, fn) {
+  const model = parseUrl(url);
+  fn(model);
+  return buildUrl(model);
+}
+
+// --- Round trip with no edits ---
+
+test('round trips the report URL byte for byte', () => {
+  assert.equal(buildUrl(parseUrl(REPORT_URL)), REPORT_URL);
+});
+
+for (const url of [
+  'https://example.com/',
+  'https://example.com/docs/guide/?q=hello%20world&tags=a,b&redirect=https://x.io/cb&debug#section-2',
+  'https://example.com/search?q=c%2B%2B+tips&empty=&flag',
+  'https://example.com/u/me@corp.com',
+  'https://example.com/files/report%zz.pdf?download=1&v=2',
+  'https://example.com/a//b',
+  'https://example.com:8443/p?x=1#frag',
+  'https://user:pw@example.com/p?x=1',
+]) {
+  test(`round trips unchanged: ${url}`, () => {
+    assert.equal(buildUrl(parseUrl(url)), url);
+  });
+}
+
+test('parseUrl returns null for a non-URL', () => {
+  assert.equal(parseUrl('not a url'), null);
+});
+
+// --- F1: an edit changes only what it touches ---
+
+test('editing one value leaves every other byte alone', () => {
+  const after = edit(REPORT_URL, m => setValue(m, 0, 'hello there'));
+  assert.equal(
+    after,
+    'http://127.0.0.1:8765/docs/guide/?q=hello%20there&tags=a,b&redirect=https://x.io/cb&debug&tag=a&tag=b#section-2'
+  );
+});
+
+test('a trailing slash survives an edit', () => {
+  const after = edit('https://example.com/docs/guide/?q=1', m => setValue(m, 0, '2'));
+  assert.equal(after, 'https://example.com/docs/guide/?q=2');
+});
+
+test('the absence of a trailing slash also survives', () => {
+  const after = edit('https://example.com/docs/guide?q=1', m => setValue(m, 0, '2'));
+  assert.equal(after, 'https://example.com/docs/guide?q=2');
+});
+
+test('a space is written as %20, never as +', () => {
+  const after = edit('https://example.com/p?q=x', m => setValue(m, 0, 'a b'));
+  assert.equal(after, 'https://example.com/p?q=a%20b');
+});
+
+test('an untouched + is kept as + but reads as a space', () => {
+  const model = parseUrl('https://example.com/p?q=c%2B%2B+tips&other=1');
+  assert.equal(model.entries[0].value, 'c++ tips');
+  setValue(model, 1, '2');
+  assert.equal(buildUrl(model), 'https://example.com/p?q=c%2B%2B+tips&other=2');
+});
+
+test('a comma is not re-encoded in a value the user edits', () => {
+  const after = edit('https://example.com/p?tags=a,b', m => setValue(m, 0, 'a,b,c'));
+  assert.equal(after, 'https://example.com/p?tags=a,b,c');
+});
+
+test('a URL inside a value keeps its : and /', () => {
+  const after = edit('https://example.com/p?redirect=x', m =>
+    setValue(m, 0, 'https://x.io/cb')
+  );
+  assert.equal(after, 'https://example.com/p?redirect=https://x.io/cb');
+});
+
+test('an & or = typed into a value is escaped so it cannot split the query', () => {
+  const after = edit('https://example.com/p?a=1&b=2', m => setValue(m, 0, 'x&y=z'));
+  assert.equal(after, 'https://example.com/p?a=x%26y%3Dz&b=2');
+});
+
+test('a # typed into a value is escaped so it cannot start a fragment', () => {
+  const after = edit('https://example.com/p?a=1#frag', m => setValue(m, 0, 'x#y'));
+  assert.equal(after, 'https://example.com/p?a=x%23y#frag');
+});
+
+// --- F1: bare flags ---
+
+test('a bare flag stays bare when another param is edited', () => {
+  const after = edit('https://example.com/p?debug&a=1', m => setValue(m, 1, '2'));
+  assert.equal(after, 'https://example.com/p?debug&a=2');
+});
+
+test('a bare flag reads as an empty value', () => {
+  const model = parseUrl('https://example.com/p?debug');
+  assert.deepEqual(
+    { key: model.entries[0].key, value: model.entries[0].value },
+    { key: 'debug', value: '' }
+  );
+});
+
+test('clearing a bare flag leaves it bare rather than making it debug=', () => {
+  const after = edit('https://example.com/p?debug', m => setValue(m, 0, ''));
+  assert.equal(after, 'https://example.com/p?debug');
+});
+
+test('giving a bare flag a value turns it into a normal param', () => {
+  const after = edit('https://example.com/p?debug', m => setValue(m, 0, 'on'));
+  assert.equal(after, 'https://example.com/p?debug=on');
+});
+
+test('renaming a bare flag keeps it bare', () => {
+  const after = edit('https://example.com/p?debug', m => setKey(m, 0, 'verbose'));
+  assert.equal(after, 'https://example.com/p?verbose');
+});
+
+test('an empty value keeps its = (empty= is not the same as a bare flag)', () => {
+  const after = edit('https://example.com/p?empty=&a=1', m => setValue(m, 1, '2'));
+  assert.equal(after, 'https://example.com/p?empty=&a=2');
+});
+
+// --- F1: duplicate keys ---
+
+test('duplicate keys are kept as separate rows', () => {
+  const model = parseUrl('https://example.com/p?tag=a&tag=b');
+  assert.deepEqual(
+    model.entries.map(e => [e.key, e.value]),
+    [['tag', 'a'], ['tag', 'b']]
+  );
+});
+
+test('editing one of two duplicate keys leaves the other alone', () => {
+  const after = edit('https://example.com/p?tag=a&tag=b', m => setValue(m, 1, 'c'));
+  assert.equal(after, 'https://example.com/p?tag=a&tag=c');
+});
+
+test('deleting one of two duplicate keys keeps the other', () => {
+  const after = edit('https://example.com/p?tag=a&tag=b', m => deleteEntry(m, 0));
+  assert.equal(after, 'https://example.com/p?tag=b');
+});
+
+// --- F2 territory: %zz must not throw in the model ---
+
+test('a malformed escape in a segment decodes to itself instead of throwing', () => {
+  const model = parseUrl('https://example.com/files/report%zz.pdf?download=1&v=2');
+  assert.deepEqual(model.segments.map(s => s.text), ['files', 'report%zz.pdf']);
+  assert.deepEqual(model.entries.map(e => [e.key, e.value]), [
+    ['download', '1'],
+    ['v', '2'],
+  ]);
+});
+
+test('a malformed escape survives an edit elsewhere', () => {
+  const after = edit('https://example.com/files/report%zz.pdf?v=2', m => setValue(m, 0, '3'));
+  assert.equal(after, 'https://example.com/files/report%zz.pdf?v=3');
+});
+
+test('a malformed escape in a query value decodes to itself', () => {
+  const model = parseUrl('https://example.com/p?a=%zz&b=1');
+  assert.equal(model.entries[0].value, '%zz');
+  setValue(model, 1, '2');
+  assert.equal(buildUrl(model), 'https://example.com/p?a=%zz&b=2');
+});
+
+test('safeDecode falls back to the raw text', () => {
+  assert.equal(safeDecode('%zz'), '%zz');
+  assert.equal(safeDecode('a%20b'), 'a b');
+});
+
+// --- F6: blank key ---
+
+test('setKey rejects a blank key and changes nothing', () => {
+  const model = parseUrl('https://example.com/p?tags=a,b');
+  const result = setKey(model, 0, '   ');
+  assert.deepEqual(result, { ok: false, error: BLANK_KEY });
+  assert.equal(buildUrl(model), 'https://example.com/p?tags=a,b');
+});
+
+test('addEntry rejects a blank key, as it already did', () => {
+  const model = parseUrl('https://example.com/p');
+  assert.deepEqual(addEntry(model, '', 'x'), { ok: false, error: BLANK_KEY });
+  assert.equal(buildUrl(model), 'https://example.com/p');
+});
+
+// --- F6: blank segment ---
+
+test('setSegment rejects a blank segment and changes nothing', () => {
+  const model = parseUrl('http://127.0.0.1:8765/docs/guide?x=1');
+  const result = setSegment(model, 0, '');
+  assert.deepEqual(result, { ok: false, error: BLANK_SEGMENT });
+  assert.equal(buildUrl(model), 'http://127.0.0.1:8765/docs/guide?x=1');
+});
+
+// --- @ in a segment ---
+
+test('an @ in a segment is not re-encoded when that segment is edited', () => {
+  const after = edit('https://example.com/u/placeholder', m =>
+    setSegment(m, 1, 'me@corp.com')
+  );
+  assert.equal(after, 'https://example.com/u/me@corp.com');
+});
+
+test('an untouched @ segment is left alone', () => {
+  const after = edit('https://example.com/u/me@corp.com?a=1', m => setValue(m, 0, '2'));
+  assert.equal(after, 'https://example.com/u/me@corp.com?a=2');
+});
+
+test('a segment editor escapes / so it cannot add a segment', () => {
+  const after = edit('https://example.com/a/b', m => setSegment(m, 1, 'x/y'));
+  assert.equal(after, 'https://example.com/a/x%2Fy');
+});
+
+test('a space in a segment becomes %20', () => {
+  const after = edit('https://example.com/a/b', m => setSegment(m, 1, 'my file'));
+  assert.equal(after, 'https://example.com/a/my%20file');
+});
+
+// --- Structural edits ---
+
+test('deleting the last segment leaves a root path', () => {
+  const after = edit('https://example.com/only?a=1', m => deleteSegment(m, 0));
+  assert.equal(after, 'https://example.com/?a=1');
+});
+
+test('deleting a middle segment keeps the trailing slash', () => {
+  const after = edit('https://example.com/a/b/c/', m => deleteSegment(m, 1));
+  assert.equal(after, 'https://example.com/a/c/');
+});
+
+test('adding a param to a URL with no query adds the ?', () => {
+  const after = edit('https://example.com/p', m => addEntry(m, 'a', 'b c'));
+  assert.equal(after, 'https://example.com/p?a=b%20c');
+});
+
+test('adding a param appends without touching the existing ones', () => {
+  const after = edit(REPORT_URL, m => addEntry(m, 'new', 'v'));
+  assert.equal(after, REPORT_URL.replace('#section-2', '&new=v#section-2'));
+});
+
+test('clearing every param drops the ? and keeps the hash', () => {
+  const after = edit('https://example.com/p/?a=1&b=2#frag', m => clearEntries(m));
+  assert.equal(after, 'https://example.com/p/#frag');
+});
+
+test('an empty path segment is preserved rather than collapsed', () => {
+  const model = parseUrl('http://127.0.0.1:8765//guide?x=1');
+  assert.deepEqual(model.segments.map(s => s.raw), ['', 'guide']);
+  setValue(model, 0, '2');
+  assert.equal(buildUrl(model), 'http://127.0.0.1:8765//guide?x=2');
+});
