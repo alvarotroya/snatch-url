@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snatch URL</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Snatch URL</h1>
+      <div id="url-display" class="url-bar" title="Current URL"></div>
+    </header>
+
+    <div id="scroll-body">
+      <!-- Path section -->
+      <section id="path-section">
+        <div class="section-header">
+          <span class="section-label">PATH</span>
+          <span id="path-count" class="count-badge"></span>
+        </div>
+        <div id="no-path" class="empty-state hidden"><p>No path segments.</p></div>
+        <ul id="path-list"></ul>
+      </section>
+
+      <!-- Query section -->
+      <section id="query-section">
+        <div class="section-header">
+          <span class="section-label">QUERY</span>
+          <span id="query-count" class="count-badge"></span>
+          <button id="copy-all-btn" class="btn btn-sm" title="Copy all as JSON">Copy All</button>
+          <button id="clear-btn" class="btn btn-sm btn-danger" title="Clear all query params">Clear All</button>
+        </div>
+        <div id="no-query" class="empty-state hidden"><p>No query parameters.</p></div>
+        <ul id="query-list"></ul>
+      </section>
+    </div>
+
+    <div id="add-param" class="add-section">
+      <input id="new-key" type="text" placeholder="key" class="input-key">
+      <span class="sep">=</span>
+      <input id="new-value" type="text" placeholder="value" class="input-value">
+      <button id="add-btn" class="btn btn-primary">Add</button>
+    </div>
+
+    <div id="error-msg" class="error hidden"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
