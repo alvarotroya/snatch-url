@@ -1,11 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Query Feature Parser",
+  "name": "Snatch URL",
   "version": "1.0.0",
-  "description": "Chrome extension for parsing and managing URL query parameters",
+  "description": "Edit the current tab's path segments and query parameters from a popup, and navigate to the result.",
   "permissions": [
-    "activeTab",
-    "tabs"
+    "activeTab"
   ],
   "action": {
     "default_popup": "popup.html",
