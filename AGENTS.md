@@ -30,11 +30,24 @@ escape such as `%zz` falls back to the raw text. Any change here needs a case in
 Edit functions return `{ ok }` or `{ ok: false, error }` rather than throwing, so
 the popup can restore a rejected input and show the message.
 
+## Staged edits
+
+`draft.js` sits between `popup.js` and the model: it holds `base` (the URL the tab is
+on) and `work` (the edited copy), and comparing the two is what marks a row changed.
+Nothing navigates except `applyDraft` in `popup.js` - keep it that way, or F3 comes
+back. Deletions are staged in `draft.removed` rather than dropped, which is what makes
+Clear All undoable. `draft.test.js` covers the staging rules.
+
+Typing must not trigger a full re-render: `change` fires on blur, so rebuilding the
+rows there would steal focus from the field the user just tabbed into. Field edits
+call `renderChrome()` (header URL and status bar) and repaint only their own row.
+
 ## Permissions
 
 `activeTab` alone is enough: it grants both `tab.url` and `chrome.tabs.update` for the
 active tab, from the moment the toolbar action is clicked. Do not add `tabs` - it buys
-nothing here and adds the "Read your browsing history" install warning.
+nothing here and adds the "Read your browsing history" install warning. `tabs.create`,
+which "Apply in new tab" uses, needs no permission either.
 
 The grant is what makes browser verification fiddly: it lasts only for the tab that was
 active when the action fired, so nothing can be tested by opening `popup.html` as an
