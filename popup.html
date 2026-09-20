@@ -10,41 +10,49 @@
   <div id="app">
     <header>
       <h1>Snatch URL</h1>
-      <div id="url-display" class="url-bar" title="Current URL"></div>
+      <p id="url-display" class="url-bar"></p>
     </header>
 
     <div id="scroll-body">
       <!-- Path section -->
-      <section id="path-section">
+      <section id="path-section" aria-labelledby="path-label">
         <div class="section-header">
-          <span class="section-label">PATH</span>
+          <span class="section-label" id="path-label">PATH</span>
           <span id="path-count" class="count-badge"></span>
         </div>
         <div id="no-path" class="empty-state hidden"><p>No path segments.</p></div>
-        <ul id="path-list"></ul>
+        <ul id="path-list" aria-labelledby="path-label"></ul>
       </section>
 
       <!-- Query section -->
-      <section id="query-section">
+      <section id="query-section" aria-labelledby="query-label">
         <div class="section-header">
-          <span class="section-label">QUERY</span>
+          <span class="section-label" id="query-label">QUERY</span>
           <span id="query-count" class="count-badge"></span>
-          <button id="copy-all-btn" class="btn btn-sm" title="Copy all as JSON">Copy All</button>
-          <button id="clear-btn" class="btn btn-sm btn-danger" title="Clear all query params">Clear All</button>
+          <button id="copy-all-btn" class="btn btn-sm" aria-label="Copy all path segments and query parameters as JSON">Copy All</button>
+          <button id="clear-btn" class="btn btn-sm btn-danger" aria-label="Clear all query parameters">Clear All</button>
         </div>
         <div id="no-query" class="empty-state hidden"><p>No query parameters.</p></div>
-        <ul id="query-list"></ul>
+        <ul id="query-list" aria-labelledby="query-label"></ul>
       </section>
     </div>
 
     <div id="add-param" class="add-section">
-      <input id="new-key" type="text" placeholder="key" class="input-key">
-      <span class="sep">=</span>
-      <input id="new-value" type="text" placeholder="value" class="input-value">
-      <button id="add-btn" class="btn btn-primary">Add</button>
+      <input id="new-key" type="text" placeholder="key" class="input-key" aria-label="New parameter name">
+      <span class="sep" aria-hidden="true">=</span>
+      <input id="new-value" type="text" placeholder="value" class="input-value" aria-label="New parameter value">
+      <button id="add-btn" class="btn btn-primary" aria-label="Add query parameter">Add</button>
     </div>
 
-    <div id="error-msg" class="error hidden"></div>
+    <!-- Nothing is sent to the tab until one of these is pressed (F3). -->
+    <div id="status-bar" class="status-bar">
+      <span id="change-summary" class="change-summary" role="status"></span>
+      <button id="revert-btn" class="btn btn-sm" aria-label="Discard all unapplied changes" disabled>Revert</button>
+      <button id="apply-new-btn" class="btn btn-sm" aria-label="Apply changes in a new tab" disabled>New tab</button>
+      <button id="apply-btn" class="btn btn-sm btn-primary" aria-label="Apply changes to this tab" disabled>Apply</button>
+    </div>
+
+    <div id="error-msg" class="error hidden" role="status"></div>
   </div>
 
   <script type="module" src="popup.js"></script>
