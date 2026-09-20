@@ -19,6 +19,7 @@ import {
   deleteEntry,
   addEntry,
   clearEntries,
+  toJson,
   safeDecode,
   BLANK_KEY,
   BLANK_SEGMENT,
@@ -276,4 +277,46 @@ test('an empty path segment is preserved rather than collapsed', () => {
   assert.deepEqual(model.segments.map(s => s.raw), ['', 'guide']);
   setValue(model, 0, '2');
   assert.equal(buildUrl(model), 'http://127.0.0.1:8765//guide?x=2');
+});
+
+// --- F5: Copy All keeps duplicate keys and the path ---
+
+// toJson builds its query with a null prototype, so compare a plain copy.
+const plain = query => ({ ...query });
+
+test('toJson keeps a repeated key as an array of its values', () => {
+  const json = toJson(parseUrl('https://example.com/p?tag=a&tag=b&q=1'));
+  assert.deepEqual(plain(json.query), { tag: ['a', 'b'], q: '1' });
+});
+
+test('toJson collects three values of the same key in order', () => {
+  const json = toJson(parseUrl('https://example.com/p?t=a&t=b&t=c'));
+  assert.deepEqual(json.query.t, ['a', 'b', 'c']);
+});
+
+test('toJson includes the decoded path segments', () => {
+  const json = toJson(parseUrl('https://example.com/files/my%20doc.pdf?a=1'));
+  assert.deepEqual(json.path, ['files', 'my doc.pdf']);
+});
+
+test('toJson reports a bare flag as an empty value', () => {
+  const json = toJson(parseUrl('https://example.com/p?debug'));
+  assert.deepEqual(plain(json.query), { debug: '' });
+});
+
+test('toJson survives a key named __proto__', () => {
+  const json = toJson(parseUrl('https://example.com/p?__proto__=1&__proto__=2'));
+  assert.deepEqual(plain(json.query).__proto__, ['1', '2']);
+});
+
+test('toJson of a query-less URL is an empty object, and still has the path', () => {
+  const json = toJson(parseUrl('https://example.com/a/b'));
+  assert.deepEqual(json.path, ['a', 'b']);
+  assert.equal(JSON.stringify(json.query), '{}');
+});
+
+test('toJson leaves a malformed escape as its raw text', () => {
+  const json = toJson(parseUrl('https://example.com/files/report%zz.pdf?a=%zz'));
+  assert.deepEqual(json.path, ['files', 'report%zz.pdf']);
+  assert.deepEqual(plain(json.query), { a: '%zz' });
 });

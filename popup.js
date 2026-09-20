@@ -3,6 +3,7 @@
 import {
   parseUrl,
   buildUrl,
+  toJson,
   setSegment,
   deleteSegment,
   setKey,
@@ -17,15 +18,42 @@ import {
 // text, so an edit only rewrites the part it touches.
 let state = null;
 
+const CANNOT_EDIT = "Can't edit this page.";
+
 // --- DOM helpers ---
 
 function $(id) { return document.getElementById(id); }
+
+// One timer for the toast, reset on every message, so the newest message
+// always gets its full three seconds instead of inheriting an older timer.
+let errorTimer = null;
 
 function showError(msg) {
   const el = $('error-msg');
   el.textContent = msg;
   el.classList.remove('hidden');
-  setTimeout(() => el.classList.add('hidden'), 3000);
+  clearTimeout(errorTimer);
+  errorTimer = setTimeout(() => el.classList.add('hidden'), 3000);
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).catch(() => showError('Clipboard access denied.'));
+}
+
+/**
+ * Push the model to the tab and to the header. Every change goes through
+ * here, so the header URL can never drift from the model.
+ */
+function commit() {
+  const url = buildUrl(state);
+  showUrl(url);
+  updateTabUrl(url);
+}
+
+function showUrl(url) {
+  const urlBar = $('url-display');
+  urlBar.textContent = url;
+  urlBar.title = url;
 }
 
 /**
@@ -39,7 +67,7 @@ function applyEdit(result, input, previousText) {
     showError(result.error);
     return;
   }
-  updateTabUrl(buildUrl(state));
+  commit();
 }
 
 // --- Render path ---
@@ -86,14 +114,13 @@ function renderPath() {
       applyEdit(setSegment(state, i, segEl.value), segEl, previous);
     });
 
-    copyBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(seg.text)
-        .catch(() => showError('Clipboard access denied.'));
-    });
+    // Read the input, not the value captured at render time: the row is not
+    // re-rendered after an edit, so only the input holds what is on screen.
+    copyBtn.addEventListener('click', () => copyToClipboard(segEl.value));
 
     delBtn.addEventListener('click', () => {
       deleteSegment(state, idx);
-      updateTabUrl(buildUrl(state));
+      commit();
       renderPath();
     });
 
@@ -151,13 +178,11 @@ function renderQuery() {
       applyEdit(setValue(state, idx, valEl.value), valEl, previous);
     });
 
-    copyBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(value).catch(() => showError('Clipboard access denied.'));
-    });
+    copyBtn.addEventListener('click', () => copyToClipboard(valEl.value));
 
     delBtn.addEventListener('click', () => {
       deleteEntry(state, idx);
-      updateTabUrl(buildUrl(state));
+      commit();
       renderQuery();
     });
 
@@ -168,10 +193,17 @@ function renderQuery() {
 
 // --- Tab interaction ---
 
+/**
+ * `activeTab` does not cover restricted pages such as `chrome://` or the Web
+ * Store, and a navigation there fails through `lastError` rather than by
+ * throwing, so it has to be read inside the callback or the edit is silent.
+ */
 function updateTabUrl(newUrl) {
   chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-    if (!tab) return;
-    chrome.tabs.update(tab.id, { url: newUrl });
+    if (chrome.runtime.lastError || !tab) { showError(CANNOT_EDIT); return; }
+    chrome.tabs.update(tab.id, { url: newUrl }, () => {
+      if (chrome.runtime.lastError) showError(CANNOT_EDIT);
+    });
   });
 }
 
@@ -179,37 +211,31 @@ function loadCurrentTab() {
   chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
     if (!tab || !tab.url) { showError('Cannot access this tab.'); return; }
 
-    const urlBar = $('url-display');
-    try {
-      const u = new URL(tab.url);
-      urlBar.textContent = u.hostname + u.pathname;
-      urlBar.title = tab.url;
-    } catch {
-      urlBar.textContent = tab.url;
+    state = parseUrl(tab.url);
+    if (!state) {
+      showUrl(tab.url);
+      showError('Invalid URL.');
+      return;
     }
 
-    state = parseUrl(tab.url);
-    if (!state) { showError('Invalid URL.'); return; }
-
+    showUrl(buildUrl(state));
     renderPath();
     renderQuery();
 
     $('copy-all-btn').onclick = () => {
-      const obj = Object.fromEntries(state.entries.map(({ key, value }) => [key, value]));
-      navigator.clipboard.writeText(JSON.stringify(obj, null, 2))
-        .catch(() => showError('Clipboard access denied.'));
+      copyToClipboard(JSON.stringify(toJson(state), null, 2));
     };
 
     $('clear-btn').onclick = () => {
       clearEntries(state);
-      updateTabUrl(buildUrl(state));
+      commit();
       renderQuery();
     };
 
     $('add-btn').onclick = () => {
       const result = addEntry(state, $('new-key').value, $('new-value').value);
       if (!result.ok) { showError(result.error); return; }
-      updateTabUrl(buildUrl(state));
+      commit();
       renderQuery();
       $('new-key').value = '';
       $('new-value').value = '';

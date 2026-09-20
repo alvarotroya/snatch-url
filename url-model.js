@@ -231,3 +231,24 @@ export function clearEntries(model) {
   model.entries.length = 0;
   return OK;
 }
+
+// --- Export ---
+
+/**
+ * The model as plain JSON, for Copy All: the decoded path segments in order,
+ * and the query as an object where a key that repeats carries an array of its
+ * values, so `tag=a&tag=b` is not flattened to the last one (F5).
+ *
+ * @param {UrlModel} model
+ * @returns {{path: string[], query: Object}}
+ */
+export function toJson(model) {
+  // A null prototype so a key such as `__proto__` is an ordinary own property.
+  const query = Object.create(null);
+  for (const { key, value } of model.entries) {
+    if (!Object.hasOwn(query, key)) query[key] = value;
+    else if (Array.isArray(query[key])) query[key].push(value);
+    else query[key] = [query[key], value];
+  }
+  return { path: model.segments.map(s => s.text), query };
+}
