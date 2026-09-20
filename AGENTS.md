@@ -52,11 +52,16 @@ ordinary tab.
 2. `chrome-devtools-axi open <test url>` - this tab must be the active one.
 3. `POST /call` on the bridge port with `install_extension`
    (`{"name":"install_extension","args":{"path":"<repo>"},"roots":["<repo>"]}`), then
-   `trigger_extension_action` with the returned id. Triggering the action is what grants
-   `activeTab` and opens the popup; nothing else does.
+   `trigger_extension_action` (its argument is `id`, not `extensionId`). Triggering the
+   action is what grants `activeTab` and opens the popup; nothing else does, and it only
+   works while an ordinary tab - not the popup - is the selected target.
 4. The popup appears as a new page in `chrome-devtools-axi pages`; `selectpage` it, then
    `snapshot` or `screenshot`. Check an edit by re-listing pages and reading the test
    tab's URL.
+
+The driver refuses to open a `chrome://` tab, so a restricted-page failure cannot be
+reproduced by navigating to one; force it instead by stubbing `chrome.tabs.update` in the
+popup to invoke its callback with a fake `chrome.runtime.lastError`.
 
 An unpacked extension's id is derived from its absolute path: sha256 of it, first 32 hex
 digits, each mapped 0-f to a-p.
