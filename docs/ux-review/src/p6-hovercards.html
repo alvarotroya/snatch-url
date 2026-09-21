@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Snatch URL · F · Hover Cards</title>
+<link rel="stylesheet" href="proto.css">
+<style>
+/* --- F: the actions come to the part under the pointer ---------------- */
+
+#stage {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+  padding: 10px 12px 14px;
+}
+
+/* --- section labels: a thin strip above the line --- */
+#sections {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 7px;
+}
+.sec {
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--surface0);
+  border-radius: 999px;
+  padding: 1px 8px;
+  cursor: default;
+  color: var(--muted);
+}
+.sec[data-group="origin"] { color: var(--mauve); }
+.sec[data-group="path"] { color: var(--peach); }
+.sec[data-group="query"] { color: var(--blue); }
+.sec[data-group="hash"] { color: var(--teal); }
+.sec:hover, .sec.on { background: var(--surface0); border-color: currentColor; }
+.sec .n { color: var(--surface2); margin-left: 4px; letter-spacing: 0; }
+#sections .hint { margin-left: auto; font-size: 10px; color: var(--surface2); }
+
+/* --- the URL, horizontal, wrapping, every part a hover target --- */
+#line {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--text);
+  background: var(--crust);
+  border: 1px solid var(--surface0);
+  border-radius: 6px;
+  padding: 7px 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  outline: none;
+}
+#line::selection, #line ::selection { background: #4c4f6a; color: #fff; }
+
+.tk { border-radius: 3px; padding: 2px 0; }
+.tk.part { cursor: pointer; outline: none; }
+.tk.part:hover { background: rgba(205, 214, 244, 0.12); }
+.tk.part.on { background: rgba(203, 166, 247, 0.22); box-shadow: 0 0 0 1px rgba(203, 166, 247, 0.55); }
+.tk.part:focus-visible { outline: 2px solid var(--lavender); outline-offset: -1px; }
+.tk.run { background: rgba(203, 166, 247, 0.16); }
+.tk.changed { box-shadow: inset 0 -2px 0 var(--staged); }
+.tk.part.on.changed { box-shadow: inset 0 -2px 0 var(--staged), 0 0 0 1px rgba(203, 166, 247, 0.55); }
+
+/* the inline editor: the part itself becomes an input, punctuation stays */
+.tk-edit {
+  font: inherit;
+  line-height: 1.3;
+  background: var(--surface0);
+  border: 1px solid var(--mauve);
+  border-radius: 3px;
+  padding: 0 3px;
+  margin: 0;
+  outline: none;
+  max-width: 100%;
+  vertical-align: baseline;
+}
+.tk-edit::selection { background: var(--mauve); color: var(--base); }
+
+/* --- the card --- */
+#card {
+  position: absolute;
+  z-index: 30;
+  width: 284px;
+  max-width: calc(100% - 12px);
+  background: var(--mantle);
+  border: 1px solid var(--surface1);
+  border-radius: 7px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  font-size: 11.5px;
+}
+#card.wide { width: 380px; }
+/* a tolerant hit area bridging the gap to the part, on the part's side only */
+#card::before { content: ''; position: absolute; left: 0; right: 0; height: 16px; }
+#card.below::before { top: -16px; }
+#card.above::before { bottom: -16px; }
+
+.card-body {
+  overflow: auto;
+  padding: 7px 9px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card-head { display: flex; align-items: center; gap: 6px; min-height: 18px; }
+.card-role {
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-role b { color: var(--text); font-family: var(--mono); text-transform: none; letter-spacing: 0; font-weight: 600; }
+.card-role .chg { color: var(--staged); }
+.card-close {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 3px;
+  border-radius: 3px;
+}
+.card-close:hover { color: var(--text); background: var(--surface0); }
+
+.card-val {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--crust);
+  border-radius: 4px;
+  padding: 4px 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 66px;
+  overflow: auto;
+  user-select: text;
+}
+.card-val i { color: var(--surface2); font-style: italic; }
+
+.card-acts { display: flex; flex-wrap: wrap; gap: 4px; }
+.card-acts .btn { padding: 3px 7px; font-size: 11px; }
+.card-acts .btn.on { border-color: var(--mauve); color: var(--mauve); }
+
+/* --- Look inside: the decode stack --- */
+.layers {
+  border-top: 1px dashed var(--surface0);
+  padding-top: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.layer-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--surface2);
+  margin-bottom: 3px;
+}
+.layer-label .tag { color: var(--mauve); }
+.layer-label .lcopy {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  padding: 0 3px;
+  border-radius: 3px;
+}
+.layer-label .lcopy:hover { color: var(--text); background: var(--surface0); }
+.layer-text {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  background: var(--crust);
+  border-radius: 4px;
+  padding: 4px 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 74px;
+  overflow: auto;
+  user-select: text;
+}
+.layer-edit {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text);
+  background: var(--crust);
+  border: 1px solid var(--surface0);
+  border-radius: 4px;
+  padding: 4px 6px;
+  resize: vertical;
+  min-height: 30px;
+  outline: none;
+  display: block;
+}
+.layer-edit:focus { border-color: var(--mauve); }
+.layer-put { display: flex; align-items: center; gap: 7px; }
+.layer-put .hint { font-size: 10px; color: var(--surface2); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="demo-bar">
+    <span class="demo-tag">demo url</span>
+    <button data-sample="short">short</button>
+    <button data-sample="typical" aria-pressed="true">typical</button>
+    <button data-sample="monster">monster</button>
+    <span class="spacer"></span>
+    <span>440 × 600</span>
+  </div>
+  <header>
+    <h1>Snatch URL</h1>
+    <span class="variant">F · Hover Cards</span>
+  </header>
+
+  <div id="stage">
+    <div id="sections"></div>
+    <div id="line" role="group" aria-label="URL"></div>
+    <div id="card" class="hidden" role="group" aria-label="Part actions"><div class="card-body"></div></div>
+  </div>
+
+  <div class="keys">
+    <span><kbd>hover</kbd> card</span>
+    <span><kbd>click</kbd> pin</span>
+    <span><kbd>dbl-click</kbd> type over</span>
+    <span><kbd>←→</kbd> walk</span>
+    <span><kbd>↓</kbd> actions</span>
+    <span><kbd>enter</kbd> edit</span>
+    <span><kbd>⌫</kbd> delete</span>
+    <span><kbd>i</kbd> inside</span>
+    <span><kbd>esc</kbd> close</span>
+  </div>
+  <div class="status-bar" id="status-bar">
+    <span class="change-summary" id="change-summary" role="status">No unapplied changes</span>
+    <button class="btn" id="revert-btn" disabled>Revert</button>
+    <button class="btn" id="new-btn" disabled>New tab</button>
+    <button class="btn btn-primary" id="apply-btn" disabled>Apply</button>
+  </div>
+  <div class="toast hidden" id="toast"></div>
+</div>
+
+<script type="module">
+import {
+  SAMPLES, tokenize, groupRange, encodeFor, spliceRaw, peel, badgeFor,
+  countChanges, ROLE_LABEL,
+} from './proto-core.js';
+
+const $ = id => document.getElementById(id);
+const stage = $('stage');
+const line = $('line');
+const cardEl = $('card');
+const cardBody = cardEl.querySelector('.card-body');
+const sections = $('sections');
+
+let baseText = SAMPLES.typical;   // the URL the tab is on
+let text = baseText;              // the edited draft
+let baseTok = tokenize(baseText);
+let tok = tokenize(text);
+
+// The one card. kind: 'part' | 'section'. mode: 'hover' | 'focus' | 'pin'.
+// Hover closes when the pointer leaves part and card; focus follows the
+// keyboard and closes when focus leaves; pin stays until closed.
+const card = { kind: null, id: null, mode: 'hover', inside: false };
+let openTimer = null;
+let closeTimer = null;
+let pointerInCard = false;
+let dragging = false;     // mouse button held on the line: a text selection, not a hover
+let focusId = null;       // roving tabindex home
+let suppressId = null;    // Escape closed the card for this focused part; do not reopen
+let editing = null;
+
+const GROUPS = [['origin', 'host'], ['path', 'path'], ['query', 'query'], ['hash', 'fragment']];
+const groupLabel = g => GROUPS.find(x => x[0] === g)[1];
+
+// --- helpers ------------------------------------------------------------
+
+const escapeHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const parts = () => tok.tokens.filter(t => t.editable);
+const tokById = id => tok.tokens.find(t => t.id === id) || null;
+const partEl = id => line.querySelector(`.part[data-id="${CSS.escape(id)}"]`);
+const peelable = t => t.role === 'val' || t.role === 'key' || t.role === 'seg';
+
+/** The part without its own punctuation: `8443` not `:8443`, `reviews` not `#reviews`. */
+const rawOf = t => (t.role === 'port' || t.role === 'hash') ? t.raw.slice(1) : t.raw;
+const textOf = t => t.role === 'port' ? t.raw.slice(1) : t.text;
+/** The most human form: what "Copy decoded" gives. */
+const plainOf = t => peelable(t) ? peel(rawOf(t)).at(-1).text : textOf(t);
+const badgeOf = t => peelable(t) ? badgeFor(rawOf(t)) : null;
+
+function partTitle(t) {
+  if (t.role === 'val') {
+    const k = tok.tokens.find(x => x.role === 'key' && x.index === t.index);
+    return `value of <b>${escapeHtml(k ? k.text : '?')}</b>`;
+  }
+  if (t.role === 'key') return `param name · #${t.index + 1}`;
+  if (t.role === 'seg') return `path segment · #${t.index + 1}`;
+  return ROLE_LABEL[t.role];
+}
+
+function ariaOf(t) {
+  const n = t.index !== undefined ? ` ${t.index + 1}` : '';
+  return `${ROLE_LABEL[t.role]}${n}: ${textOf(t)}`;
+}
+
+/**
+ * Which parts differ from the URL the tab is on. Compared as a bag of
+ * (role, raw) rather than by id, so a delete does not paint the whole tail
+ * yellow when every later index shifts by one.
+ */
+function changedSet() {
+  const bag = new Map();
+  for (const t of baseTok.tokens) {
+    if (!t.editable) continue;
+    const k = t.role + '\u0000' + t.raw;
+    bag.set(k, (bag.get(k) || 0) + 1);
+  }
+  const out = new Set();
+  for (const t of tok.tokens) {
+    if (!t.editable) continue;
+    const k = t.role + '\u0000' + t.raw;
+    const n = bag.get(k) || 0;
+    if (n > 0) bag.set(k, n - 1); else out.add(t.id);
+  }
+  return out;
+}
+
+// --- render -------------------------------------------------------------
+
+function render() {
+  renderSections();
+  renderLine();
+  renderChrome();
+  syncCard();
+}
+
+function renderSections() {
+  sections.innerHTML = GROUPS.map(([g, label]) => {
+    if (!groupRange(tok.tokens, g)) return '';
+    const n = tok.tokens.filter(t => t.group === g && t.editable).length;
+    const count = (g === 'path' || g === 'query') ? `<span class="n">${n}</span>` : '';
+    return `<button class="sec" data-group="${g}" aria-label="${label} section">${label}${count}</button>`;
+  }).join('') + '<span class="hint">hover a part · click pins</span>';
+}
+
+function renderLine() {
+  const changed = changedSet();
+  line.innerHTML = tok.tokens.map((t, i) => {
+    const cls = ['tk', 'r-' + t.role, t.editable ? 'part' : '', changed.has(t.id) ? 'changed' : '']
+      .filter(Boolean).join(' ');
+    const attrs = t.editable
+      ? ` data-id="${escapeHtml(t.id)}" tabindex="-1" role="button" aria-label="${escapeHtml(ariaOf(t))}"`
+      : '';
+    return `<span class="${cls}" data-i="${i}" data-group="${t.group}"${attrs}>${escapeHtml(t.raw)}</span>`;
+  }).join('');
+  const list = parts();
+  if (!list.some(t => t.id === focusId)) focusId = list[0] ? list[0].id : null;
+  const home = focusId && partEl(focusId);
+  if (home) home.tabIndex = 0;
+}
+
+function renderChrome() {
+  const n = countChanges(baseText, text, baseTok.tokens, tok.tokens);
+  const dirty = text !== baseText;
+  $('change-summary').textContent = dirty
+    ? `${n} unapplied change${n === 1 ? '' : 's'}`
+    : 'No unapplied changes';
+  $('status-bar').classList.toggle('dirty', dirty);
+  for (const id of ['apply-btn', 'new-btn', 'revert-btn']) $(id).disabled = !dirty;
+}
+
+function setText(next) {
+  text = next;
+  tok = tokenize(text);
+  render();
+}
+
+// --- the card -----------------------------------------------------------
+
+function renderCard() {
+  const closeBtn = card.mode === 'pin'
+    ? '<button class="card-close" data-act="close" title="Close (Esc)" aria-label="Close">×</button>' : '';
+  let html = '';
+
+  if (card.kind === 'part') {
+    const t = tokById(card.id);
+    const badge = badgeOf(t);
+    const raw = rawOf(t);
+    const plain = plainOf(t);
+    const chg = changedSet().has(t.id) ? ' <span class="chg">· changed</span>' : '';
+    html += `<div class="card-head"><span class="card-role">${partTitle(t)}${chg}</span>`
+      + (badge ? `<span class="badge ${badge}">${badge}</span>` : '') + closeBtn + '</div>';
+    html += `<div class="card-val">${textOf(t) ? escapeHtml(textOf(t)) : '<i>empty</i>'}</div>`;
+    html += '<div class="card-acts">'
+      + `<button class="btn" data-act="copy" title="Copy as written: ${escapeHtml(raw)}">Copy</button>`
+      + (plain !== raw ? `<button class="btn" data-act="copy-plain" title="Copy decoded: ${escapeHtml(plain)}">Copy decoded</button>` : '')
+      + '<button class="btn" data-act="edit" title="Type over it right in the URL (Enter)">Edit</button>'
+      + (t.role === 'host' ? ''
+        : `<button class="btn btn-danger" data-act="del" title="${t.group === 'query' ? 'Removes the whole parameter and its &' : 'Removes it and its punctuation'}">`
+          + (t.group === 'query' ? 'Delete param' : 'Delete') + '</button>')
+      + (badge ? `<button class="btn${card.inside ? ' on' : ''}" data-act="inside" aria-expanded="${card.inside}" title="Show the decode stack (i)">`
+          + (card.inside ? 'Close inside' : 'Look inside') + '</button>' : '')
+      + '</div>';
+    if (card.inside && badge) html += layersHtml(t);
+  } else {
+    const g = card.id;
+    const r = groupRange(tok.tokens, g);
+    const run = text.slice(r.start, r.end);
+    const shown = (g === 'query' || g === 'hash') ? run.slice(1) : run;
+    const n = tok.tokens.filter(t => t.group === g && t.editable).length;
+    html += `<div class="card-head"><span class="card-role">section · <b>${groupLabel(g)}</b>`
+      + (g === 'path' || g === 'query' ? ` · ${n} part${n === 1 ? '' : 's'}` : '') + '</span>' + closeBtn + '</div>';
+    html += `<div class="card-val">${shown ? escapeHtml(shown) : '<i>empty</i>'}</div>`;
+    const clearable = g !== 'origin' && n > 0;
+    html += '<div class="card-acts">'
+      + '<button class="btn" data-act="copy-sec" title="Copy this whole run as written">Copy section</button>'
+      + '<button class="btn" data-act="select" title="Select it in the URL, ready for ⌘C">Select all</button>'
+      + `<button class="btn btn-danger" data-act="clear"${clearable ? '' : ' disabled'} title="${g === 'origin' ? 'The host has to stay' : 'Remove every part of this section'}">Clear</button>`
+      + '</div>';
+  }
+  cardBody.innerHTML = html;
+  cardEl.classList.toggle('wide', card.kind === 'part' && card.inside);
+}
+
+function layersHtml(t) {
+  const layers = peel(rawOf(t));
+  const last = layers.length - 1;
+  const editable = layers[last].kind !== 'jwt';
+  return '<div class="layers">' + layers.map((l, i) => {
+    const isEdit = editable && i === last;
+    return '<div class="layer"><div class="layer-label">'
+      + `<span>${i + 1}. ${escapeHtml(l.label)}</span>`
+      + (l.isUrl ? '<span class="badge url">url</span>' : '')
+      + (isEdit ? '<span class="tag">editable</span>' : '')
+      + `<button class="lcopy" data-act="copy-layer" data-layer="${i}" title="Copy this layer">copy</button></div>`
+      + (isEdit
+        ? `<textarea class="layer-edit" id="layer-edit" rows="${Math.min(7, Math.max(1, l.text.split('\n').length))}" spellcheck="false" aria-label="Edit the decoded value">${escapeHtml(l.text)}</textarea>`
+        : `<div class="layer-text">${escapeHtml(l.text)}</div>`)
+      + '</div>';
+  }).join('')
+  + (editable
+    ? '<div class="layer-put"><button class="btn btn-primary" data-act="put-back" title="Re-encode every layer back into the URL (⌘Enter)">Put it back</button>'
+      + `<span class="hint">re-encodes ${layers.slice(1).map(l => l.kind).reverse().concat('url').join(' → ')}</span></div>`
+    : '<div class="layer-put"><span class="hint">A JWT is signed - read it here, edit it at the source.</span></div>')
+  + '</div>';
+}
+
+/**
+ * Put the card just under the part (or above it when there is no room), and
+ * never outside the stage: left is clamped, and when neither side has room
+ * for the whole card the roomier side gets it and the card scrolls inside.
+ */
+function placeCard(anchorEl) {
+  const sr = stage.getBoundingClientRect();
+  const rects = [...anchorEl.getClientRects()].filter(r => r.width || r.height);
+  if (rects.length === 0) return;
+  const first = rects[0];
+  const last = rects[rects.length - 1];
+  const isPart = anchorEl.classList.contains('part');
+  const lh = isPart ? parseFloat(getComputedStyle(line).lineHeight) : first.height;
+  const pad = Math.max(0, (lh - first.height) / 2);   // to the edge of the line box
+  const GAP = 4;
+  const EDGE = 6;
+  const vw = stage.clientWidth;
+  const vh = stage.clientHeight;
+
+  cardBody.style.maxHeight = '';
+  cardEl.style.width = '';
+  const w = Math.min(cardEl.offsetWidth, vw - EDGE * 2);
+  cardEl.style.width = w + 'px';
+  const h = cardEl.offsetHeight;
+
+  const belowTop = last.bottom - sr.top + pad + GAP;
+  const aboveBottom = first.top - sr.top - pad - GAP;
+  const spaceBelow = vh - EDGE - belowTop;
+  const spaceAbove = aboveBottom - EDGE;
+
+  let side;
+  let top;
+  let maxH;
+  if (h <= spaceBelow) { side = 'below'; top = belowTop; maxH = spaceBelow; }
+  else if (h <= spaceAbove) { side = 'above'; top = aboveBottom - h; maxH = spaceAbove; }
+  else if (spaceBelow >= spaceAbove) { side = 'below'; top = belowTop; maxH = spaceBelow; }
+  else { side = 'above'; maxH = spaceAbove; top = aboveBottom - maxH; }
+
+  let left = (side === 'below' ? last.left : first.left) - sr.left;
+  left = Math.max(EDGE, Math.min(left, vw - w - EDGE));
+
+  cardEl.classList.toggle('above', side === 'above');
+  cardEl.classList.toggle('below', side === 'below');
+  cardEl.style.top = (top + stage.scrollTop) + 'px';
+  cardEl.style.left = (left + stage.scrollLeft) + 'px';
+  cardBody.style.maxHeight = Math.max(48, maxH - 2) + 'px';
+}
+
+function anchorFor() {
+  return card.kind === 'part' ? partEl(card.id) : sections.querySelector(`.sec[data-group="${card.id}"]`);
+}
+
+function openCard(kind, id, mode) {
+  clearTimeout(openTimer);
+  clearTimeout(closeTimer);
+  if (!(card.kind === kind && card.id === id)) card.inside = false;
+  card.kind = kind;
+  card.id = id;
+  card.mode = mode;
+  const anchor = anchorFor();
+  if (!anchor) { closeCard(); return; }
+  renderCard();
+  cardEl.classList.remove('hidden');
+  placeCard(anchor);
+  markOn();
+}
+
+function closeCard() {
+  clearTimeout(openTimer);
+  clearTimeout(closeTimer);
+  card.kind = null;
+  card.id = null;
+  card.mode = 'hover';
+  card.inside = false;
+  cardEl.classList.add('hidden');
+  cardBody.innerHTML = '';
+  markOn();
+}
+
+function markOn() {
+  for (const n of line.querySelectorAll('.on, .run')) n.classList.remove('on', 'run');
+  for (const n of sections.querySelectorAll('.on')) n.classList.remove('on');
+  if (card.kind === 'part') {
+    const el = partEl(card.id);
+    if (el) el.classList.add('on');
+  } else if (card.kind === 'section') {
+    for (const n of line.querySelectorAll(`.tk[data-group="${card.id}"]`)) n.classList.add('run');
+    const s = sections.querySelector(`.sec[data-group="${card.id}"]`);
+    if (s) s.classList.add('on');
+  }
+}
+
+/** After a re-render: same card, new DOM, new content - or gone with its part. */
+function syncCard() {
+  if (!card.kind) return;
+  const exists = card.kind === 'part' ? !!tokById(card.id) : !!groupRange(tok.tokens, card.id);
+  if (!exists) { closeCard(); return; }
+  openCard(card.kind, card.id, card.mode);
+}
+
+// --- hover mechanics ----------------------------------------------------
+
+function hoverOpen(kind, id) {
+  clearTimeout(closeTimer);
+  if (editing || dragging) return;
+  if (card.mode === 'pin') return;
+  if (card.kind === kind && card.id === id) return;
+  clearTimeout(openTimer);
+  // A card is already up: switching is quick; a first appearance waits a
+  // beat so sweeping across the line does not flicker.
+  openTimer = setTimeout(() => openCard(kind, id, 'hover'), card.kind ? 60 : 110);
+}
+
+function focusedPartId() {
+  const a = document.activeElement;
+  return a && a.classList && a.classList.contains('part') ? a.dataset.id : null;
+}
+
+function scheduleClose() {
+  clearTimeout(openTimer);
+  clearTimeout(closeTimer);
+  if (card.mode === 'pin') return;
+  closeTimer = setTimeout(() => {
+    if (pointerInCard || card.mode === 'pin') return;
+    const f = focusedPartId();
+    if (f && f !== suppressId) {
+      if (!(card.kind === 'part' && card.id === f)) openCard('part', f, 'focus');
+      else card.mode = 'focus';
+    } else {
+      closeCard();
+    }
+  }, 240);
+}
+
+line.addEventListener('mouseover', e => {
+  const el = e.target.closest('.part');
+  if (el) hoverOpen('part', el.dataset.id); else scheduleClose();
+});
+line.addEventListener('mouseleave', scheduleClose);
+sections.addEventListener('mouseover', e => {
+  const el = e.target.closest('.sec');
+  if (el) hoverOpen('section', el.dataset.group); else scheduleClose();
+});
+sections.addEventListener('mouseleave', scheduleClose);
+cardEl.addEventListener('mouseenter', () => {
+  pointerInCard = true;
+  clearTimeout(openTimer);
+  clearTimeout(closeTimer);
+});
+cardEl.addEventListener('mouseleave', () => { pointerInCard = false; scheduleClose(); });
+
+line.addEventListener('mousedown', () => { dragging = true; });
+document.addEventListener('mouseup', () => { dragging = false; });
+
+// --- pin / focus ----------------------------------------------------------
+
+function togglePin(kind, id) {
+  if (card.kind === kind && card.id === id && card.mode === 'pin') {
+    closeCard();
+    if (kind === 'part') suppressId = id;
+    return;
+  }
+  suppressId = null;
+  openCard(kind, id, 'pin');
+}
+
+line.addEventListener('click', e => {
+  const el = e.target.closest('.part');
+  if (!el || editing) return;
+  const sel = getSelection();
+  if (sel && !sel.isCollapsed) return;   // a drag-select, not a pick
+  togglePin('part', el.dataset.id);
+});
+line.addEventListener('dblclick', e => {
+  const el = e.target.closest('.part');
+  if (!el || editing) return;
+  e.preventDefault();
+  getSelection().removeAllRanges();
+  startEdit(el.dataset.id);
+});
+sections.addEventListener('click', e => {
+  const el = e.target.closest('.sec');
+  if (el) togglePin('section', el.dataset.group);
+});
+
+function setHome(id) {
+  for (const n of line.querySelectorAll('.part[tabindex="0"]')) n.tabIndex = -1;
+  focusId = id;
+  const el = partEl(id);
+  if (el) el.tabIndex = 0;
+}
+
+function focusPart(id) {
+  setHome(id);
+  const el = partEl(id);
+  if (el) el.focus();
+}
+
+line.addEventListener('focusin', e => {
+  const el = e.target.closest('.part');
+  if (!el || editing) return;
+  const id = el.dataset.id;
+  focusId = id;
+  if (suppressId && suppressId !== id) suppressId = null;
+  if (suppressId === id) return;
+  if (card.kind === 'part' && card.id === id) return;
+  // The card follows the keyboard; a pinned card stays pinned as it follows.
+  openCard('part', id, card.mode === 'pin' ? 'pin' : 'focus');
+});
+
+function checkFocusLoss() {
+  if (card.mode !== 'focus' || editing) return;
+  const a = document.activeElement;
+  if (a && (line.contains(a) || cardEl.contains(a))) return;
+  if (pointerInCard) return;
+  closeCard();
+}
+line.addEventListener('focusout', () => setTimeout(checkFocusLoss, 0));
+cardEl.addEventListener('focusout', () => setTimeout(checkFocusLoss, 0));
+
+document.addEventListener('mousedown', e => {
+  if (cardEl.contains(e.target)) return;
+  if (e.target.closest('.part') || e.target.closest('.sec')) return;
+  if (card.mode === 'pin') closeCard();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || editing) return;
+  if (line.contains(e.target) || cardEl.contains(e.target)) return;   // handled there
+  if (card.kind) closeCard();
+});
+
+// --- keyboard on the line -------------------------------------------------
+
+line.addEventListener('keydown', e => {
+  if (editing) return;
+  const el = e.target.closest('.part');
+  if (!el) return;
+  const id = el.dataset.id;
+  const list = parts();
+  const i = list.findIndex(t => t.id === id);
+  const go = j => {
+    const t = list[Math.max(0, Math.min(list.length - 1, j))];
+    if (t) focusPart(t.id);
+  };
+
+  if (e.key === 'ArrowRight') { e.preventDefault(); go(i + 1); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); go(i - 1); }
+  else if (e.key === 'Home') { e.preventDefault(); go(0); }
+  else if (e.key === 'End') { e.preventDefault(); go(list.length - 1); }
+  else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (!(card.kind === 'part' && card.id === id)) { suppressId = null; openCard('part', id, 'focus'); }
+    const b = cardBody.querySelector('button:not([disabled])');
+    if (b) b.focus();
+  } else if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); startEdit(id); }
+  else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deletePart(id, true); }
+  else if (e.key === ' ') { e.preventDefault(); togglePin('part', id); }
+  else if (e.key === 'i' || e.key === 'I') {
+    if (!badgeOf(tokById(id))) return;
+    e.preventDefault();
+    suppressId = null;
+    if (!(card.kind === 'part' && card.id === id)) openCard('part', id, 'pin');
+    card.inside = !card.inside;
+    openCard('part', id, 'pin');
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    if (card.kind) { closeCard(); suppressId = id; }
+  } else if ((e.metaKey || e.ctrlKey) && (e.key === 'c' || e.key === 'C')) {
+    const sel = getSelection();
+    if (sel && !sel.isCollapsed) return;   // a real text selection: let the browser copy it
+    e.preventDefault();
+    const t = tokById(id);
+    copy(e.shiftKey ? plainOf(t) : rawOf(t));
+  }
+});
+
+function backToPart(close) {
+  if (card.kind !== 'part') { if (close) closeCard(); return; }
+  const id = card.id;
+  if (close) { closeCard(); suppressId = id; }
+  focusPart(id);
+}
+
+cardEl.addEventListener('keydown', e => {
+  if (e.target.tagName === 'TEXTAREA') {
+    if (e.key === 'Escape') { e.preventDefault(); backToPart(true); }
+    else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); putBack(); }
+    return;
+  }
+  const btns = [...cardBody.querySelectorAll('button:not([disabled])')];
+  const at = btns.indexOf(document.activeElement);
+  if (e.key === 'ArrowRight' && at !== -1) { e.preventDefault(); btns[(at + 1) % btns.length].focus(); }
+  else if (e.key === 'ArrowLeft' && at !== -1) { e.preventDefault(); btns[(at - 1 + btns.length) % btns.length].focus(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); backToPart(false); }
+  else if (e.key === 'Escape') { e.preventDefault(); backToPart(true); }
+});
+
+// --- card actions -------------------------------------------------------
+
+cardEl.addEventListener('click', e => {
+  const btn = e.target.closest('[data-act]');
+  if (!btn || btn.disabled) return;
+  const act = btn.dataset.act;
+
+  if (act === 'close') { backToPart(true); return; }
+  if (card.kind === 'section') { sectionAct(act); return; }
+
+  const t = tokById(card.id);
+  if (!t) return;
+  if (act === 'copy') copy(rawOf(t));
+  else if (act === 'copy-plain') copy(plainOf(t));
+  else if (act === 'edit') startEdit(t.id);
+  else if (act === 'del') deletePart(t.id, false);
+  else if (act === 'inside') {
+    // A taller panel you will work in: pin it so a slip of the mouse cannot take it away.
+    card.inside = !card.inside;
+    openCard('part', t.id, 'pin');
+  } else if (act === 'copy-layer') copy(peel(rawOf(t))[+btn.dataset.layer].text);
+  else if (act === 'put-back') putBack();
+});
+
+function sectionAct(act) {
+  const g = card.id;
+  const r = groupRange(tok.tokens, g);
+  if (!r) return;
+  if (act === 'copy-sec') {
+    const run = text.slice(r.start, r.end);
+    copy((g === 'query' || g === 'hash') ? run.slice(1) : run);
+  } else if (act === 'select') {
+    const els = [...line.querySelectorAll(`.tk[data-group="${g}"]`)];
+    if (els.length === 0) return;
+    const range = document.createRange();
+    range.setStartBefore(els[0]);
+    range.setEndAfter(els[els.length - 1]);
+    const sel = getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    if (card.mode !== 'pin') openCard('section', g, 'pin');
+    flash('Selected in the URL - ⌘C copies it.');
+  } else if (act === 'clear') {
+    if (g === 'origin') return;
+    const next = g === 'path' ? spliceRaw(text, r.start, r.end, '/') : spliceRaw(text, r.start, r.end, '');
+    const label = groupLabel(g);
+    closeCard();
+    setText(next);
+    flash(`Cleared the ${label} - Revert puts it back.`);
+  }
+}
+
+// --- edit in place --------------------------------------------------------
+
+function startEdit(id) {
+  const t = tokById(id);
+  const el = partEl(id);
+  if (!t || !el) return;
+  closeCard();
+  editing = { id };
+  const value = textOf(t);
+  const input = document.createElement('input');
+  input.className = 'tk-edit r-' + t.role;
+  input.value = value;
+  input.spellcheck = false;
+  input.setAttribute('aria-label', 'Edit ' + ROLE_LABEL[t.role]);
+  const size = () => { input.style.width = Math.min(Math.max(input.value.length + 1, 3), 44) + 'ch'; };
+  size();
+  el.replaceWith(input);
+  input.focus();
+  input.select();                       // type-over: the whole part is armed
+
+  // Enter commits and re-renders, which removes the input; the guard keeps a
+  // trailing blur from committing twice.
+  let done = false;
+  const finish = ok => {
+    if (done) return;
+    done = true;
+    editing = null;
+    if (!ok || input.value === value) { render(); suppressId = id; focusPart(id); return; }
+    commitEdit(t, input.value);
+  };
+  input.addEventListener('blur', () => finish(true));
+  input.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    else if (e.key === 'Tab') { e.preventDefault(); finish(true); }
+  });
+  input.addEventListener('input', size);
+}
+
+function commitEdit(t, value) {
+  const raw = t.role === 'port'
+    ? (value.trim() ? ':' + value.trim().replace(/^:/, '') : '')
+    : encodeFor(t.role, value);
+  commitRaw(t, raw, true);
+}
+
+/** Splice new raw text over a part; the part at the same offset keeps focus. */
+function commitRaw(t, raw, quiet) {
+  if (raw === t.raw) { if (!quiet) flash('Nothing changed.'); render(); focusPart(t.id); return; }
+  const next = spliceRaw(text, t.start, t.end, raw);
+  const r = tokenize(next);
+  if (!r.ok) { flash(r.error, true); render(); focusPart(t.id); return; }
+  setText(next);
+  const landing = parts().find(x => x.start === t.start) || tokById(t.id);
+  if (landing) focusPart(landing.id);
+  if (!quiet) flash('Put back, re-encoded.');
+}
+
+// --- delete ---------------------------------------------------------------
+
+function rangeToDelete(t) {
+  // Deleting a part takes its punctuation with it, so the URL stays a URL.
+  let from = t.start;
+  let to = t.end;
+  const all = tok.tokens;
+  const i = all.indexOf(t);
+  if (t.role === 'seg') {
+    if (all[i - 1] && all[i - 1].role === 'sep') from = all[i - 1].start;
+  } else if (t.role === 'key' || t.role === 'val') {
+    const idx = t.index;
+    const pair = all.filter(x => (x.role === 'key' || x.role === 'eq' || x.role === 'val') && x.index === idx);
+    from = pair[0].start;
+    to = pair[pair.length - 1].end;
+    const before = all[all.indexOf(pair[0]) - 1];
+    const after = all[all.indexOf(pair[pair.length - 1]) + 1];
+    if (before && before.role === 'amp') from = before.start;
+    else if (after && after.role === 'amp') to = after.end;
+    else if (before && before.role === 'qmark') from = before.start;
+  }
+  return [from, to];
+}
+
+function deletePart(id, viaKeyboard) {
+  const t = tokById(id);
+  if (!t) return;
+  if (t.role === 'host') { flash('The host has to stay.', true); return; }
+  const [from, to] = rangeToDelete(t);
+  const list = parts();
+  const i = list.findIndex(x => x.id === id);
+  // Where focus lands, found by offset in the NEW text: ids are index-based
+  // and every later index shifts by one.
+  const after = list.slice(i + 1).find(x => x.start >= to);
+  const before = list.slice(0, i).reverse().find(x => x.end <= from);
+  const landAt = after ? after.start - (to - from) : before ? before.start : null;
+  const what = t.group === 'query' ? `param ${tok.tokens.find(x => x.role === 'key' && x.index === t.index).text}` : ROLE_LABEL[t.role];
+
+  closeCard();
+  setText(spliceRaw(text, from, to, ''));
+  const landing = landAt === null ? null : parts().find(x => x.start === landAt);
+  if (landing) {
+    if (viaKeyboard) focusPart(landing.id); else setHome(landing.id);
+  }
+  flash(`Removed ${what} - Revert puts it back.`);
+}
+
+// --- Look inside: put the human form back -------------------------------
+
+function reassemble(layers, edited) {
+  const kinds = layers.map(l => l.kind);
+  let s = edited;
+  if (kinds.includes('json')) {
+    try { s = JSON.stringify(JSON.parse(s)); } catch { flash('That is not valid JSON.', true); return null; }
+  }
+  if (kinds.includes('base64')) {
+    const before = layers[kinds.indexOf('base64') - 1].text;   // the base64 as it was
+    let b;
+    try { b = btoa(s); } catch { flash('Only ASCII can go back into base64 here.', true); return null; }
+    if (/[-_]/.test(before)) b = b.replace(/\+/g, '-').replace(/\//g, '_');
+    if (!/=$/.test(before)) b = b.replace(/=+$/, '');
+    s = b;
+  }
+  return s;
+}
+
+function putBack() {
+  const t = card.kind === 'part' ? tokById(card.id) : null;
+  const ta = $('layer-edit');
+  if (!t || !ta) return;
+  const layers = peel(rawOf(t));
+  if (ta.value === layers[layers.length - 1].text) { flash('Nothing changed.'); return; }
+  const inner = reassemble(layers, ta.value);
+  if (inner === null) return;
+  commitRaw(t, encodeFor(t.role, inner), false);
+}
+
+// --- chrome -----------------------------------------------------------------
+
+function copy(s) {
+  navigator.clipboard.writeText(s).then(
+    () => flash('Copied: ' + (s.length > 38 ? s.slice(0, 38) + '…' : s)),
+    () => flash('Clipboard blocked in this frame.', true));
+}
+
+let toastTimer = null;
+function flash(msg, bad) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.toggle('err', !!bad);
+  el.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 2200);
+}
+
+$('apply-btn').onclick = () => {
+  if (text === baseText) return;
+  baseText = text;
+  baseTok = tokenize(baseText);
+  closeCard();
+  render();
+  flash('Applied - the tab would navigate here.');
+};
+$('new-btn').onclick = () => flash('Would open a new tab at the edited URL.');
+$('revert-btn').onclick = () => { closeCard(); setText(baseText); flash('Reverted.'); };
+
+for (const btn of document.querySelectorAll('[data-sample]')) {
+  btn.onclick = () => {
+    for (const b of document.querySelectorAll('[data-sample]')) b.setAttribute('aria-pressed', 'false');
+    btn.setAttribute('aria-pressed', 'true');
+    baseText = SAMPLES[btn.dataset.sample];
+    baseTok = tokenize(baseText);
+    closeCard();
+    focusId = null;
+    setText(baseText);
+  };
+}
+
+window.addEventListener('resize', () => { if (card.kind) syncCard(); });
+
+render();
+</script>
+</body>
+</html>

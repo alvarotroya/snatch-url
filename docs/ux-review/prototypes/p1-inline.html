@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Snatch URL · A · Live Line</title>
+<style>
+/* Shared chrome for the three prototypes.
+   Catppuccin Mocha, same stack as the shipped popup (styles.css), so the
+   comparison is about the editing surface and not about the paint. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --base: #1e1e2e;
+  --mantle: #181825;
+  --crust: #11111b;
+  --surface0: #313244;
+  --surface1: #45475a;
+  --surface2: #585b70;
+  --text: #cdd6f4;
+  --muted: #a6adc8;
+  --mauve: #cba6f7;
+  --blue: #89b4fa;
+  --green: #a6e3a1;
+  --peach: #fab387;
+  --yellow: #f9e2af;
+  --red: #f38ba8;
+  --teal: #94e2d5;
+  --lavender: #b4befe;
+  --pink: #f5c2e7;
+  --staged: #f9e2af;
+  --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+/* One colour per role, identical in all three prototypes. */
+.r-scheme, .r-sep, .r-qmark, .r-eq, .r-amp { color: var(--surface2); }
+.r-host { color: var(--mauve); }
+.r-userinfo { color: var(--pink); }
+.r-port { color: var(--pink); }
+.r-seg { color: var(--peach); }
+.r-key { color: var(--blue); }
+.r-val { color: var(--green); }
+.r-hash { color: var(--teal); }
+
+html, body { height: 100%; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  background: var(--base);
+  color: var(--text);
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* --- Demo scaffolding (NOT part of any design) --- */
+.demo-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--crust);
+  border-bottom: 1px dashed var(--surface1);
+  font-size: 10px;
+  color: var(--surface2);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.demo-bar .demo-tag { color: var(--surface2); margin-right: 2px; }
+.demo-bar button {
+  background: transparent;
+  border: 1px solid var(--surface0);
+  border-radius: 999px;
+  color: var(--muted);
+  font: inherit;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.demo-bar button[aria-pressed="true"] { background: var(--surface0); color: var(--text); border-color: var(--surface1); }
+.demo-bar .spacer { flex: 1; }
+
+/* --- Header --- */
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 9px 12px 7px;
+  background: var(--mantle);
+  border-bottom: 1px solid var(--surface0);
+  flex-shrink: 0;
+}
+header h1 {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mauve);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+header .variant {
+  font-size: 11px;
+  color: var(--muted);
+  flex: 1;
+  text-align: right;
+}
+
+/* --- Shared bottom bars --- */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--surface0);
+  background: var(--mantle);
+  flex-shrink: 0;
+}
+.change-summary { flex: 1; font-size: 11px; color: var(--muted); min-width: 0; }
+.status-bar.dirty .change-summary { color: var(--staged); font-weight: 600; }
+
+.btn {
+  background: var(--surface0);
+  border: 1px solid var(--surface1);
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  padding: 4px 9px;
+  white-space: nowrap;
+  transition: background 0.1s, border-color 0.1s;
+}
+.btn:hover { background: var(--surface1); }
+.btn-primary { background: var(--mauve); border-color: var(--mauve); color: var(--base); font-weight: 600; }
+.btn-primary:hover { background: var(--lavender); border-color: var(--lavender); }
+.btn-danger { color: var(--red); }
+.btn-danger:hover { background: #3d2a2e; border-color: var(--red); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+.btn:disabled:hover { background: var(--surface0); }
+.btn-primary:disabled:hover { background: var(--mauve); }
+
+.toast {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 46px;
+  padding: 7px 10px;
+  border-radius: 5px;
+  background: #2a3d2e;
+  color: var(--green);
+  border: 1px solid var(--green);
+  font-size: 12px;
+  z-index: 40;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+.toast.err { background: #3d2a2e; color: var(--red); border-color: var(--red); }
+.hidden { display: none !important; }
+
+:focus-visible { outline: 2px solid var(--mauve); outline-offset: 1px; }
+
+/* Thin scrollbars everywhere. */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface1); border-radius: 3px; }
+
+/* --- Keyboard hint strip --- */
+.keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 5px 12px;
+  background: var(--crust);
+  border-top: 1px solid var(--surface0);
+  font-size: 10px;
+  color: var(--surface2);
+  flex-shrink: 0;
+}
+.keys kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--surface0);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+/* --- Badges --- */
+.badge {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 3px;
+  padding: 1px 4px;
+  background: var(--surface0);
+  color: var(--muted);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  vertical-align: 1px;
+}
+.badge.encoded { color: var(--yellow); }
+.badge.url { color: var(--teal); }
+.badge.base64, .badge.jwt { color: var(--pink); }
+.badge.json { color: var(--lavender); }
+
+</style>
+<style>
+/* --- A: the URL itself is the input --------------------------------- */
+
+#line-wrap {
+  position: relative;
+  padding: 10px 12px 8px;
+  background: var(--base);
+  flex-shrink: 0;
+}
+
+#line {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--text);
+  background: var(--crust);
+  border: 1px solid var(--surface0);
+  border-radius: 6px;
+  padding: 8px 9px;
+  max-height: 156px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  outline: none;
+  caret-color: var(--mauve);
+  cursor: text;
+}
+#line:focus { border-color: var(--mauve); }
+#line::selection, #line ::selection { background: #4c4f6a; color: #fff; }
+
+/* A part the caret is inside, and a part the pointer is over. */
+.tk { border-radius: 2px; }
+.tk.hot { background: rgba(203, 166, 247, 0.16); }
+.tk.cur { box-shadow: inset 0 -2px 0 var(--mauve); }
+.tk.edited { box-shadow: inset 0 -2px 0 var(--staged); }
+.tk.cur.edited { box-shadow: inset 0 -2px 0 var(--staged), inset 0 -4px 0 rgba(203,166,247,.5); }
+
+#line.broken { border-color: var(--red); }
+
+/* --- map strip: jump to a whole portion --- */
+#map {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px 8px;
+  flex-shrink: 0;
+}
+#map button {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--surface0);
+  border-radius: 999px;
+  color: var(--muted);
+  padding: 2px 9px;
+  cursor: pointer;
+  font-family: inherit;
+}
+#map button:hover { background: var(--surface0); color: var(--text); }
+#map button.on { border-color: var(--mauve); color: var(--mauve); }
+#map .hint { margin-left: auto; font-size: 10px; color: var(--surface2); align-self: center; }
+
+/* --- inspector: what the caret is standing on --- */
+#inspector {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--surface0);
+  background: var(--mantle);
+  padding: 9px 12px 12px;
+}
+
+.insp-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+.insp-role {
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.insp-role b { color: var(--text); font-weight: 600; }
+.insp-head .spacer { flex: 1; }
+
+.insp-edit {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--crust);
+  border: 1px solid var(--surface0);
+  border-radius: 5px;
+  color: var(--text);
+  padding: 6px 7px;
+  resize: vertical;
+  min-height: 34px;
+  outline: none;
+}
+.insp-edit:focus { border-color: var(--mauve); }
+
+.insp-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+
+.layers { margin-top: 9px; border-top: 1px dashed var(--surface0); padding-top: 8px; }
+.layer { margin-bottom: 7px; }
+.layer-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--surface2);
+  margin-bottom: 2px;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.layer pre {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  background: var(--crust);
+  border-radius: 4px;
+  padding: 5px 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 96px;
+  overflow: auto;
+}
+.layer.last pre { color: var(--text); }
+
+.insp-empty { font-size: 12px; color: var(--surface2); line-height: 1.6; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="demo-bar">
+    <span class="demo-tag">demo url</span>
+    <button data-sample="short">short</button>
+    <button data-sample="typical" aria-pressed="true">typical</button>
+    <button data-sample="monster">monster</button>
+    <span class="spacer"></span>
+    <span>440 × 600</span>
+  </div>
+
+  <header>
+    <h1>Snatch URL</h1>
+    <span class="variant">A · Live Line</span>
+  </header>
+
+  <div id="line-wrap">
+    <div id="line" contenteditable="plaintext-only" spellcheck="false"
+         role="textbox" aria-multiline="true" aria-label="The URL, editable in place"></div>
+  </div>
+
+  <div id="map">
+    <button data-group="origin">host</button>
+    <button data-group="path">path</button>
+    <button data-group="query">query</button>
+    <button data-group="hash">#</button>
+    <span class="hint">click = select that whole portion</span>
+  </div>
+
+  <div id="inspector"></div>
+
+  <div class="keys">
+    <span><kbd>dbl-click</kbd> select a part</span>
+    <span><kbd>Alt</kbd>+<kbd>↑</kbd> grow selection</span>
+    <span><kbd>Alt</kbd>+<kbd>↓</kbd> shrink</span>
+    <span><kbd>Alt</kbd>+<kbd>←→</kbd> part to part</span>
+    <span><kbd>⌘C</kbd> copy chars</span>
+    <span><kbd>⌘↵</kbd> apply</span>
+  </div>
+
+  <div class="status-bar" id="status-bar">
+    <span class="change-summary" id="change-summary" role="status">No unapplied changes</span>
+    <button class="btn" id="revert-btn" disabled>Revert</button>
+    <button class="btn" id="new-btn" disabled>New tab</button>
+    <button class="btn btn-primary" id="apply-btn" disabled>Apply</button>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+</div>
+
+<script type="module">
+// Bundled by build.js - see that file for why this is inline.
+// ---- url-model.js ----
+// Snatch URL - url-model.js
+//
+// A raw-preserving URL model.
+//
+// The rule this module exists for: an edit must change only the part it
+// touches. Every untouched byte of the path and query survives a parse ->
+// build round trip exactly as it arrived, so `%20` stays `%20`, `a,b` stays
+// `a,b`, a bare `debug` stays bare, and a trailing slash is kept.
+//
+// To do that the model stores the RAW text of every segment and every
+// key/value, and only re-encodes the single part an edit touches. Decoded
+// text is carried alongside for display, and decoding never throws: a
+// malformed escape like `%zz` falls back to the raw text.
+
+// --- Encoding ---
+
+// Characters that are legal unescaped inside a path segment (RFC 3986 pchar:
+// sub-delims plus ":" and "@"). encodeURIComponent escapes them, so we put
+// them back, which is what keeps `me@corp.com` readable in a segment.
+const SEGMENT_KEEP = /%(2C|3B|3A|40|24|26|2B|3D|21|27|28|29|2A)/gi;
+
+// Same idea for a query part, minus the characters that would end or split
+// the part itself: `&`, `=`, `+` and `#` stay escaped.
+const QUERY_KEEP = /%(2C|3B|3A|40|24|2F|3F|21|27|28|29|2A)/gi;
+
+function encodeWith(keep, text) {
+  return encodeURIComponent(text).replace(keep, m => decodeURIComponent(m));
+}
+
+function encodeSegment(text) {
+  return encodeWith(SEGMENT_KEEP, text);
+}
+
+function encodeQueryPart(text) {
+  return encodeWith(QUERY_KEEP, text);
+}
+
+// --- Decoding ---
+
+/** decodeURIComponent that returns the raw text instead of throwing. */
+function safeDecode(raw) {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+/** A query part also decodes `+` as a space, the way a browser form does. */
+function decodeQueryPart(raw) {
+  try {
+    return decodeURIComponent(raw.replace(/\+/g, '%20'));
+  } catch {
+    return raw.replace(/\+/g, ' ');
+  }
+}
+
+// --- Parse ---
+
+/**
+ * @typedef {Object} Segment
+ * @property {string} raw   the segment exactly as it appears in the URL
+ * @property {string} text  the decoded segment, for display and editing
+ *
+ * @typedef {Object} Entry
+ * @property {string} rawKey
+ * @property {string|null} rawValue  null for a bare flag such as `debug`
+ * @property {string} key
+ * @property {string} value
+ *
+ * @typedef {Object} UrlModel
+ * @property {string} href           the original URL, untouched
+ * @property {string} prefix         everything before the path (scheme, host, port)
+ * @property {Segment[]} segments
+ * @property {boolean} trailingSlash
+ * @property {Entry[]} entries
+ * @property {boolean} hasQuery      whether the URL carried a `?` at all
+ * @property {string} hash           the raw hash including `#`, or ''
+ */
+
+/**
+ * @param {string} url
+ * @returns {UrlModel|null} null when the URL cannot be parsed
+ */
+function parseUrl(url) {
+  let u;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+
+  const tail = u.pathname + u.search + u.hash;
+  const prefix = u.href.endsWith(tail)
+    ? u.href.slice(0, u.href.length - tail.length)
+    : u.origin;
+
+  return {
+    href: u.href,
+    prefix,
+    ...parsePath(u.pathname),
+    entries: parseQuery(u.search),
+    hasQuery: u.search !== '',
+    hash: u.hash,
+  };
+}
+
+function parsePath(pathname) {
+  // An empty path segment is real (`/a//b`) and is preserved, so this keeps
+  // every `/` the URL had. Only a trailing one is lifted out into a flag.
+  const parts = pathname.startsWith('/') ? pathname.slice(1).split('/') : pathname.split('/');
+  let trailingSlash = false;
+  if (parts.length > 0 && parts[parts.length - 1] === '') {
+    parts.pop();
+    trailingSlash = true;
+  }
+  return {
+    segments: parts.map(raw => ({ raw, text: safeDecode(raw) })),
+    trailingSlash,
+  };
+}
+
+function parseQuery(search) {
+  const q = search.startsWith('?') ? search.slice(1) : search;
+  if (q === '') return [];
+  // An empty chunk (`a=1&&b=2`) carries nothing to edit, so it is dropped.
+  return q.split('&').filter(chunk => chunk !== '').map(toEntry);
+}
+
+function toEntry(chunk) {
+  const eq = chunk.indexOf('=');
+  const rawKey = eq === -1 ? chunk : chunk.slice(0, eq);
+  const rawValue = eq === -1 ? null : chunk.slice(eq + 1);
+  return {
+    rawKey,
+    rawValue,
+    key: decodeQueryPart(rawKey),
+    value: rawValue === null ? '' : decodeQueryPart(rawValue),
+  };
+}
+
+// --- Build ---
+
+/** @param {UrlModel} model @returns {string} */
+function buildUrl(model) {
+  return model.prefix + buildPath(model) + buildQuery(model) + model.hash;
+}
+
+function buildPath({ segments, trailingSlash }) {
+  if (segments.length === 0) return '/';
+  return '/' + segments.map(s => s.raw).join('/') + (trailingSlash ? '/' : '');
+}
+
+function buildQuery({ entries }) {
+  // Emptying the query drops the `?` too, which is what Clear All should do.
+  if (entries.length === 0) return '';
+  return '?' + entries
+    .map(e => (e.rawValue === null ? e.rawKey : e.rawKey + '=' + e.rawValue))
+    .join('&');
+}
+
+// --- Edits ---
+//
+// Every edit returns a result rather than throwing, so the popup can put a
+// rejected value back and show a message. Rejected edits leave the model
+// untouched.
+
+const OK = { ok: true };
+function reject(error) {
+  return { ok: false, error };
+}
+
+const BLANK_SEGMENT = 'Segment cannot be empty.';
+const BLANK_KEY = 'Key cannot be empty.';
+
+/** Replace one path segment. A blank segment is rejected (F6). */
+function setSegment(model, index, text) {
+  const trimmed = text.trim();
+  if (trimmed === '') return reject(BLANK_SEGMENT);
+  model.segments[index] = { raw: encodeSegment(trimmed), text: trimmed };
+  return OK;
+}
+
+function deleteSegment(model, index) {
+  model.segments.splice(index, 1);
+  return OK;
+}
+
+/** Rename one query param. A blank key is rejected (F6). */
+function setKey(model, index, text) {
+  const trimmed = text.trim();
+  if (trimmed === '') return reject(BLANK_KEY);
+  const entry = model.entries[index];
+  entry.rawKey = encodeQueryPart(trimmed);
+  entry.key = trimmed;
+  return OK;
+}
+
+/**
+ * Set one query value. Clearing the value of a bare flag leaves it bare, so
+ * `debug` does not silently become `debug=`.
+ */
+function setValue(model, index, text) {
+  const entry = model.entries[index];
+  if (text === '' && entry.rawValue === null) return OK;
+  entry.rawValue = encodeQueryPart(text);
+  entry.value = text;
+  return OK;
+}
+
+function deleteEntry(model, index) {
+  model.entries.splice(index, 1);
+  return OK;
+}
+
+/** Append a new query param. A blank key is rejected, as Add already did. */
+function addEntry(model, key, value) {
+  const trimmedKey = key.trim();
+  if (trimmedKey === '') return reject(BLANK_KEY);
+  model.entries.push({
+    rawKey: encodeQueryPart(trimmedKey),
+    rawValue: encodeQueryPart(value),
+    key: trimmedKey,
+    value,
+  });
+  model.hasQuery = true;
+  return OK;
+}
+
+function clearEntries(model) {
+  model.entries.length = 0;
+  return OK;
+}
+
+// --- Export ---
+
+/**
+ * The model as plain JSON, for Copy All: the decoded path segments in order,
+ * and the query as an object where a key that repeats carries an array of its
+ * values, so `tag=a&tag=b` is not flattened to the last one (F5).
+ *
+ * @param {UrlModel} model
+ * @returns {{path: string[], query: Object}}
+ */
+function toJson(model) {
+  // A null prototype so a key such as `__proto__` is an ordinary own property.
+  const query = Object.create(null);
+  for (const { key, value } of model.entries) {
+    if (!Object.hasOwn(query, key)) query[key] = value;
+    else if (Array.isArray(query[key])) query[key].push(value);
+    else query[key] = [query[key], value];
+  }
+  return { path: model.segments.map(s => s.text), query };
+}
+
+// ---- proto-core.js ----
+// Shared brain for the three UX prototypes.
+//
+// It sits on top of the SHIPPED url-model.js, and adds the one thing every
+// "touch the URL directly" design needs and the current popup does not have:
+// a map from each part of the URL to the exact character range it occupies in
+// the URL string. Selection, highlighting, copy-a-piece and type-over-a-piece
+// are all splices into that string.
+//
+// Nothing here re-implements parsing or encoding: parseUrl/buildUrl/encode*
+// come from the model, so the raw-preserving invariant still holds.
+
+
+
+// --- Sample URLs -------------------------------------------------------
+// Demo scaffolding, not part of any design. Three lengths so each design can
+// be felt short, typical and awful.
+
+const SAMPLES = {
+  short: 'https://example.com/docs/guide?page=2',
+  typical:
+    'https://shop.example.com:8443/eu/catalog/women%27s%20shoes/item'
+    + '?q=running%20shoes&sort=price_desc&tags=sale,new'
+    + '&ref=https%3A%2F%2Fpartner.io%2Fgo%3Fcid%3D42%26utm%3Demail'
+    + '&debug&tag=a&tag=b#reviews',
+  monster:
+    'https://analytics.example.co.uk:8443/v2/reports/2026/q3/campaign%20roll-up/export'
+    + '?state=eyJ1c2VyIjoiYWx2YXJvIiwicm9sZSI6ImFkbWluIiwic2NvcGUiOlsicmVhZCIsIndyaXRlIl19'
+    + '&filters=country%3Ade%2Ces%7Cdevice%3Amobile%7Cplan%3Apro%2Cteam'
+    + '&from=2026-07-01&to=2026-09-30&granularity=week&currency=EUR'
+    + '&next=https%3A%2F%2Fapp.example.co.uk%2Fdash%3Ftab%3Dspend%26range%3D90d'
+    + '&utm_source=newsletter&utm_medium=email&utm_campaign=q3%20wrap&debug#panel-spend',
+};
+
+// --- Tokens ------------------------------------------------------------
+//
+// A token is one part of the URL plus where it lives in the string.
+//
+// role      what kind of part it is (drives colour and what you can do to it)
+// start,end character range in the canonical URL text
+// raw       the characters as they appear in the URL
+// text      the decoded characters, for display and for editing
+// index     position among siblings (segment index, entry index)
+// editable  whether typing over it is a defined operation
+// group     'origin' | 'path' | 'query' | 'hash'
+
+const ROLE_LABEL = {
+  scheme: 'scheme',
+  userinfo: 'user info',
+  host: 'host',
+  port: 'port',
+  sep: 'separator',
+  seg: 'path segment',
+  qmark: 'separator',
+  key: 'param name',
+  eq: 'separator',
+  val: 'param value',
+  amp: 'separator',
+  hash: 'fragment',
+};
+
+const PUNCT = new Set(['sep', 'qmark', 'eq', 'amp', 'scheme']);
+
+function isPunct(role) {
+  return PUNCT.has(role);
+}
+
+/**
+ * Parse a URL into a model plus offset-mapped tokens.
+ *
+ * The text the tokens index into is buildUrl(model), not the input string:
+ * the model drops a few meaningless things (an empty `&&` chunk), so building
+ * from it is the only way offsets are guaranteed to line up with what the user
+ * sees. For every URL that survives a round trip - which is every URL the
+ * model's tests cover - the two are byte for byte identical.
+ *
+ * @returns {{ok: boolean, text?: string, model?: object, tokens?: object[], error?: string}}
+ */
+function tokenize(url) {
+  const model = parseUrl(url);
+  if (!model) return { ok: false, error: 'Not a URL.' };
+
+  let u;
+  try {
+    u = new URL(url);
+  } catch {
+    return { ok: false, error: 'Not a URL.' };
+  }
+
+  const tokens = [];
+  let pos = 0;
+
+  const push = (role, raw, extra = {}) => {
+    const token = {
+      role,
+      raw,
+      text: extra.text !== undefined ? extra.text : raw,
+      start: pos,
+      end: pos + raw.length,
+      group: extra.group || 'origin',
+      index: extra.index,
+      editable: !isPunct(role),
+      id: `${role}-${extra.index ?? tokens.length}`,
+      ...extra,
+    };
+    tokens.push(token);
+    pos = token.end;
+    return token;
+  };
+
+  // Origin. Rebuilt part by part so the pieces add up to model.prefix; if the
+  // arithmetic ever disagrees the whole origin is emitted as one opaque token
+  // rather than producing offsets that lie.
+  const origin = [
+    ['scheme', u.protocol + '//'],
+    u.username ? ['userinfo', u.username + (u.password ? ':' + u.password : '') + '@'] : null,
+    ['host', u.hostname],
+    u.port ? ['port', ':' + u.port] : null,
+  ].filter(Boolean);
+
+  if (origin.map(([, raw]) => raw).join('') === model.prefix) {
+    for (const [role, raw] of origin) push(role, raw, { group: 'origin' });
+  } else {
+    push('host', model.prefix, { group: 'origin' });
+  }
+
+  // Path
+  if (model.segments.length === 0) {
+    push('sep', '/', { group: 'path' });
+  } else {
+    model.segments.forEach((seg, index) => {
+      push('sep', '/', { group: 'path' });
+      push('seg', seg.raw, { text: seg.text, index, group: 'path', id: `seg-${index}` });
+    });
+    if (model.trailingSlash) push('sep', '/', { group: 'path' });
+  }
+
+  // Query
+  if (model.entries.length > 0) {
+    push('qmark', '?', { group: 'query' });
+    model.entries.forEach((entry, index) => {
+      if (index > 0) push('amp', '&', { group: 'query' });
+      push('key', entry.rawKey, { text: entry.key, index, group: 'query', id: `key-${index}` });
+      if (entry.rawValue !== null) {
+        push('eq', '=', { group: 'query' });
+        push('val', entry.rawValue, { text: entry.value, index, group: 'query', id: `val-${index}` });
+      }
+    });
+  }
+
+  if (model.hash) push('hash', model.hash, { text: safeDecode(model.hash.slice(1)), group: 'hash' });
+
+  return { ok: true, text: buildUrl(model), model, tokens };
+}
+
+/** The token containing a character offset (ties go to the token that starts there). */
+function tokenAt(tokens, offset) {
+  return tokens.find(t => offset >= t.start && offset < t.end)
+    || tokens.find(t => offset === t.end)
+    || null;
+}
+
+/**
+ * Every token the range [from,to) touches. A caret (a zero-width range)
+ * touches one - and when that one is punctuation but a real part ends exactly
+ * there, the part wins: after typing at the end of a value the caret sits on
+ * the `&`, and the user is still working on the value.
+ */
+function tokensIn(tokens, from, to) {
+  if (from === to) {
+    const here = tokenAt(tokens, from);
+    if (here && isPunct(here.role)) {
+      const before = tokens.find(t => t.end === from && !isPunct(t.role));
+      if (before) return [before];
+    }
+    return here ? [here] : [];
+  }
+  return tokens.filter(t => t.start < to && t.end > from);
+}
+
+/** The character range covering a whole group, e.g. the entire query. */
+function groupRange(tokens, group) {
+  const inGroup = tokens.filter(t => t.group === group);
+  if (inGroup.length === 0) return null;
+  return { start: inGroup[0].start, end: inGroup[inGroup.length - 1].end };
+}
+
+/**
+ * The encoder that belongs to a role: typing `a b` into a path segment has to
+ * produce `a%20b`, and into a param value `a%20b` too, but the two roles keep
+ * different characters legible (see url-model.js).
+ */
+function encodeFor(role, text) {
+  if (role === 'seg') return encodeSegment(text);
+  if (role === 'key' || role === 'val') return encodeQueryPart(text);
+  if (role === 'hash') return '#' + encodeURI(text).replace(/#/g, '%23');
+  return text;
+}
+
+/** Splice new RAW text into the URL at a character range. */
+function spliceRaw(text, start, end, raw) {
+  return text.slice(0, start) + raw + text.slice(end);
+}
+
+/** Type over one token: encodes for its role, then splices. */
+function retype(text, token, newText) {
+  return spliceRaw(text, token.start, token.end, encodeFor(token.role, newText));
+}
+
+// --- Value inspection --------------------------------------------------
+//
+// What a value really is, peeled one layer at a time. This is what makes an
+// encoded value or a nested URL touchable instead of a wall of %3A%2F%2F.
+
+const B64 = /^[A-Za-z0-9+/_-]{12,}={0,2}$/;
+
+function tryBase64(s) {
+  if (!B64.test(s)) return null;
+  try {
+    const decoded = atob(s.replace(/-/g, '+').replace(/_/g, '/'));
+    // Only call it base64 if what comes out is plausible text.
+    if (!/^[\x09\x0a\x0d\x20-\x7e]+$/.test(decoded)) return null;
+    if (decoded.length < 4) return null;
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
+function tryJson(s) {
+  const t = s.trim();
+  if (!/^[[{]/.test(t)) return null;
+  try {
+    return JSON.stringify(JSON.parse(t), null, 2);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Peel a raw value into layers. Each layer is what you get after one more
+ * decoding step, and the last one is the most human form of the value.
+ *
+ * @returns {{kind: string, label: string, text: string, isUrl: boolean}[]}
+ */
+function peel(raw) {
+  const layers = [{ kind: 'raw', label: 'as written', text: raw, isUrl: false }];
+  let current = raw;
+
+  const decoded = decodeQueryPart(current);
+  if (decoded !== current) {
+    current = decoded;
+    layers.push({ kind: 'percent', label: 'percent-decoded', text: current, isUrl: false });
+  }
+
+  if (/^https?:\/\/\S+$/i.test(current.trim())) {
+    layers[layers.length - 1].isUrl = true;
+    return layers;
+  }
+
+  const jwtParts = current.split('.');
+  if (jwtParts.length === 3 && jwtParts.every(p => tryBase64(p) || p.length > 8)) {
+    const head = tryBase64(jwtParts[0]);
+    const body = tryBase64(jwtParts[1]);
+    if (head && body) {
+      const pretty = [head, body].map(p => tryJson(p) || p).join('\n---\n');
+      layers.push({ kind: 'jwt', label: 'JWT header + payload', text: pretty, isUrl: false });
+      return layers;
+    }
+  }
+
+  const b64 = tryBase64(current);
+  if (b64) {
+    current = b64;
+    layers.push({ kind: 'base64', label: 'base64-decoded', text: current, isUrl: false });
+  }
+
+  const json = tryJson(current);
+  if (json) layers.push({ kind: 'json', label: 'JSON', text: json, isUrl: false });
+
+  return layers;
+}
+
+/** A one-word badge for a value that is hiding something. */
+function badgeFor(raw) {
+  const layers = peel(raw);
+  if (layers.length === 1) return null;
+  const last = layers[layers.length - 1];
+  if (last.isUrl) return 'url';
+  return { percent: 'encoded', base64: 'base64', json: 'json', jwt: 'jwt' }[last.kind] || null;
+}
+
+// --- Staged diff -------------------------------------------------------
+
+/** Which tokens differ from the URL the tab is on, by id. */
+function changedIds(baseTokens, workTokens) {
+  const base = new Map(baseTokens.filter(t => t.editable).map(t => [t.id, t.raw]));
+  const changed = new Set();
+  for (const t of workTokens) {
+    if (!t.editable) continue;
+    if (!base.has(t.id) || base.get(t.id) !== t.raw) changed.add(t.id);
+  }
+  return changed;
+}
+
+/**
+ * How many parts the user has touched.
+ *
+ * Counting by token id is wrong the moment something is deleted: every later
+ * part shifts its index, so `key-3` now holds what `key-4` used to and the
+ * whole tail reads as edited. So this compares the two token lists as
+ * multisets of (role, raw) instead: one edit is one part gone and one part
+ * arrived, a delete is one gone, an add is one arrived.
+ */
+function countChanges(baseText, workText, baseTokens, workTokens) {
+  if (baseText === workText) return 0;
+
+  // A parameter counts as ONE thing, so deleting `tags=sale,new` is one
+  // change rather than two (its name and its value).
+  const bag = tokens => {
+    const m = new Map();
+    const params = new Map();
+    for (const t of tokens) {
+      if (!t.editable) continue;
+      if (t.role === 'key' || t.role === 'val') {
+        const cur = params.get(t.index) || { key: '', val: null };
+        if (t.role === 'key') cur.key = t.raw; else cur.val = t.raw;
+        params.set(t.index, cur);
+        continue;
+      }
+      const k = `${t.role}\u0000${t.raw}`;
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    for (const p of params.values()) {
+      const k = `param\u0000${p.key}\u0000${p.val}`;
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    return m;
+  };
+  const a = bag(baseTokens);
+  const b = bag(workTokens);
+
+  let gone = 0;
+  let arrived = 0;
+  for (const [k, n] of a) gone += Math.max(0, n - (b.get(k) || 0));
+  for (const [k, n] of b) arrived += Math.max(0, n - (a.get(k) || 0));
+
+  return Math.max(1, gone, arrived);
+}
+
+// ---- page ----
+
+
+const $ = id => document.getElementById(id);
+const line = $('line');
+
+let baseText = SAMPLES.typical;   // what the tab is on
+let text = baseText;              // what the draft says
+let tok = tokenize(text);
+let baseTok = tokenize(baseText);
+let pendingSel = null;            // [start,end] to restore after a render
+
+// --- selection <-> character offsets ---------------------------------
+
+function offsetsOf() {
+  const sel = getSelection();
+  if (!sel.rangeCount || !line.contains(sel.anchorNode)) return null;
+  const r = sel.getRangeAt(0);
+  const pre = document.createRange();
+  pre.selectNodeContents(line);
+  pre.setEnd(r.startContainer, r.startOffset);
+  const start = pre.toString().length;
+  return [start, start + r.toString().length];
+}
+
+function selectRange(start, end = start) {
+  const walk = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+  let pos = 0, r = document.createRange(), done = 0;
+  r.setStart(line, 0);
+  r.setEnd(line, 0);
+  let node;
+  while ((node = walk.nextNode())) {
+    const next = pos + node.length;
+    if (done === 0 && start <= next) { r.setStart(node, start - pos); done = 1; }
+    if (done === 1 && end <= next) { r.setEnd(node, end - pos); done = 2; break; }
+    pos = next;
+  }
+  const sel = getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
+  line.focus();
+}
+
+// --- render -----------------------------------------------------------
+
+function changedSet() {
+  if (!tok.ok || !baseTok.ok) return new Set();
+  const base = new Map(baseTok.tokens.filter(t => t.editable).map(t => [t.id, t.raw]));
+  const out = new Set();
+  for (const t of tok.tokens) {
+    if (t.editable && (!base.has(t.id) || base.get(t.id) !== t.raw)) out.add(t.id);
+  }
+  return out;
+}
+
+function renderLine() {
+  if (!tok.ok) {
+    line.classList.add('broken');
+    line.textContent = text;
+    return;
+  }
+  line.classList.remove('broken');
+  const edited = changedSet();
+  line.innerHTML = tok.tokens.map((t, i) =>
+    `<span class="tk r-${t.role}${edited.has(t.id) ? ' edited' : ''}" data-i="${i}">`
+    + escapeHtml(t.raw) + '</span>').join('');
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+
+function renderChrome() {
+  const n = tok.ok && baseTok.ok
+    ? countChanges(baseText, text, baseTok.tokens, tok.tokens)
+    : (text === baseText ? 0 : 1);
+  const dirty = text !== baseText;
+  $('change-summary').textContent = dirty
+    ? `${n} unapplied change${n === 1 ? '' : 's'}`
+    : 'No unapplied changes';
+  $('status-bar').classList.toggle('dirty', dirty);
+  for (const id of ['apply-btn', 'new-btn', 'revert-btn']) $(id).disabled = !dirty;
+}
+
+// --- the inspector: what you are standing on --------------------------
+
+let inspectorToken = null;
+
+/**
+ * The same URL with every part shown decoded. Read-only: it is the answer to
+ * "what does this actually say", which raw text alone cannot give. Whether
+ * this should be the EDITABLE view instead of a reading is open question Q2.
+ */
+function plainReadingHtml() {
+  if (!tok.ok) return '';
+  // Percent-decoded only. Peeling base64 or JSON here would turn one line
+  // into thirty; that belongs in the part inspector, not in the reading.
+  const body = tok.tokens.map(t =>
+    `<span class="r-${t.role}">${escapeHtml(t.text)}</span>`).join('');
+  return `<div class="layers"><div class="layer last">
+    <div class="layer-label">what it says, decoded</div>
+    <pre>${body}</pre></div></div>`;
+}
+
+function markCurrent(sel) {
+  for (const el of line.querySelectorAll('.tk')) el.classList.remove('cur');
+  if (!sel || !tok.ok) return;
+  for (const t of tokensIn(tok.tokens, sel[0], sel[1])) {
+    const el = line.querySelector(`.tk[data-i="${tok.tokens.indexOf(t)}"]`);
+    if (el) el.classList.add('cur');
+  }
+  for (const btn of $('map').querySelectorAll('button')) {
+    const g = groupRange(tok.tokens, btn.dataset.group);
+    btn.classList.toggle('on', !!g && sel[0] >= g.start && sel[1] <= g.end && sel[1] > sel[0]);
+  }
+}
+
+function renderInspector() {
+  const box = $('inspector');
+  const sel = offsetsOf();
+  markCurrent(sel);
+
+  if (!tok.ok) {
+    box.innerHTML = '<p class="insp-empty">That is not a URL any more - keep typing, '
+      + 'or press Revert. Nothing is sent to the tab until you Apply.</p>';
+    return;
+  }
+  if (!sel) {
+    box.innerHTML = '<p class="insp-empty">Click anywhere in the URL above. The part under the '
+      + 'caret shows up here, with what it really says inside.</p>'
+      + plainReadingHtml();
+    inspectorToken = null;
+    return;
+  }
+
+  const touched = tokensIn(tok.tokens, sel[0], sel[1]).filter(t => !isPunct(t.role));
+  const chars = sel[1] - sel[0];
+
+  if (touched.length === 0) {
+    box.innerHTML = `<p class="insp-empty">On a separator.${chars ? ' ' + chars + ' characters selected.' : ''}</p>`
+      + plainReadingHtml();
+    inspectorToken = null;
+    return;
+  }
+
+  if (touched.length > 1) {
+    box.innerHTML = `
+      <div class="insp-head">
+        <span class="insp-role"><b>${touched.length} parts</b> selected · ${chars} characters</span>
+      </div>
+      <div class="insp-actions">
+        <button class="btn" data-act="copy-sel">Copy the ${chars} characters</button>
+        <button class="btn btn-danger" data-act="del-parts">Delete these parts</button>
+      </div>
+      <p class="insp-empty" style="margin-top:9px">${touched.map(t => ROLE_LABEL[t.role]).join(' · ')}</p>`;
+    inspectorToken = null;
+    return;
+  }
+
+  const t = touched[0];
+  inspectorToken = t;
+  const layers = peel(t.raw);
+  const badge = badgeFor(t.raw);
+  const partial = chars > 0 && (sel[0] > t.start || sel[1] < t.end);
+
+  box.innerHTML = `
+    <div class="insp-head">
+      <span class="insp-role">${ROLE_LABEL[t.role]}${t.index !== undefined ? ' <b>#' + (t.index + 1) + '</b>' : ''}</span>
+      ${badge ? `<span class="badge ${badge}">${badge}</span>` : ''}
+      <span class="spacer"></span>
+      ${partial ? `<span class="insp-role">${chars} of ${t.end - t.start} chars selected</span>` : ''}
+    </div>
+    <textarea class="insp-edit" id="insp-edit" spellcheck="false"
+      aria-label="Edit this part in plain text">${escapeHtml(layers[layers.length - 1].text)}</textarea>
+    <div class="insp-actions">
+      <button class="btn btn-primary" data-act="commit">Replace part</button>
+      <button class="btn" data-act="select">Select the part</button>
+      <button class="btn" data-act="copy-plain">Copy plain</button>
+      <button class="btn" data-act="copy-raw">Copy raw</button>
+      <button class="btn btn-danger" data-act="del">Delete</button>
+    </div>
+    ${layers.length > 1 ? `<div class="layers">${layers.map((l, i) => `
+      <div class="layer ${i === layers.length - 1 ? 'last' : ''}">
+        <div class="layer-label">${l.label}${l.isUrl ? ' <span class="badge url">nested url</span>' : ''}</div>
+        <pre>${escapeHtml(l.text)}</pre>
+      </div>`).join('')}</div>` : ''}`;
+}
+
+// --- edits -------------------------------------------------------------
+
+function setText(next, sel) {
+  growStack = [];
+  text = next;
+  tok = tokenize(text);
+  pendingSel = sel || null;
+  renderLine();
+  if (pendingSel) selectRange(pendingSel[0], pendingSel[1]);
+  renderChrome();
+  renderInspector();
+}
+
+function commitPart(t, plain) {
+  // The inspector edits the most decoded form of the part, so committing
+  // re-encodes on the way back down. A base64 or JSON layer is not re-packed
+  // in this prototype - that is one of the open questions.
+  const raw = encodeFor(t.role, plain);
+  setText(spliceRaw(text, t.start, t.end, raw), [t.start, t.start + raw.length]);
+}
+
+/** The character range a part occupies once its punctuation goes with it. */
+function rangeToDelete(t) {
+  // Deleting a part takes its punctuation with it, so the URL stays a URL.
+  let from = t.start, to = t.end;
+  const all = tok.tokens;
+  const i = all.indexOf(t);
+  if (t.role === 'seg') {
+    if (all[i - 1] && all[i - 1].role === 'sep') from = all[i - 1].start;
+  } else if (t.role === 'key' || t.role === 'val') {
+    const idx = t.index;
+    const pair = all.filter(x => (x.role === 'key' || x.role === 'eq' || x.role === 'val') && x.index === idx);
+    from = pair[0].start;
+    to = pair[pair.length - 1].end;
+    const before = all[all.indexOf(pair[0]) - 1];
+    const after = all[all.indexOf(pair[pair.length - 1]) + 1];
+    if (before && before.role === 'amp') from = before.start;
+    else if (after && after.role === 'amp') to = after.end;
+    else if (before && before.role === 'qmark') from = before.start;
+  }
+  return [from, to];
+}
+
+function deleteTokens(list) {
+  if (list.length === 0) return;
+  // A key and its value expand to the same range, so overlaps are merged
+  // before anything is cut, then cut back to front so earlier offsets stay
+  // valid.
+  const ranges = list.map(rangeToDelete).sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  for (const r of ranges) {
+    const last = merged.at(-1);
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+    else merged.push([...r]);
+  }
+  let next = text;
+  for (const [from, to] of [...merged].reverse()) next = spliceRaw(next, from, to, '');
+  setText(next, [merged[0][0], merged[0][0]]);
+}
+
+// --- typing rules ------------------------------------------------------
+//
+// You are editing the raw URL, so a character that is never legal in a URL is
+// percent-encoded as you type. Structural characters are NOT: typing `&`
+// really does split a parameter, and typing `/` really does split a segment.
+// That is the point of this design.
+
+const MUST_ENCODE = /[\s"<>`{}|\\^]/;
+
+function encodeTyped(s) {
+  return [...s].map(ch => (MUST_ENCODE.test(ch) || ch.charCodeAt(0) > 126)
+    ? encodeURIComponent(ch) : ch).join('');
+}
+
+line.addEventListener('beforeinput', e => {
+  if (e.inputType !== 'insertText' && e.inputType !== 'insertFromPaste') return;
+  const data = e.data ?? (e.dataTransfer && e.dataTransfer.getData('text/plain')) ?? '';
+  if (!data) return;
+  const safe = encodeTyped(data);
+  if (safe === data) return;
+  e.preventDefault();
+  const sel = offsetsOf() || [text.length, text.length];
+  setText(spliceRaw(text, sel[0], sel[1], safe), [sel[0] + safe.length, sel[0] + safe.length]);
+  flash(`auto-encoded → ${safe}`);
+});
+
+let composing = false;
+line.addEventListener('compositionstart', () => { composing = true; });
+line.addEventListener('compositionend', () => { composing = false; onInput(); });
+
+function onInput() {
+  if (composing) return;
+  const sel = offsetsOf();
+  text = line.textContent;
+  tok = tokenize(text);
+  renderLine();
+  if (sel) selectRange(sel[0], sel[1]);
+  renderChrome();
+  renderInspector();
+}
+line.addEventListener('input', onInput);
+
+// --- pointer + keyboard selection -------------------------------------
+
+line.addEventListener('mousedown', () => { growStack = []; });
+
+line.addEventListener('dblclick', e => {
+  if (!tok.ok) return;
+  growStack = [];
+  e.preventDefault();
+  const sel = offsetsOf();
+  if (!sel) return;
+  const t = tokenAt(tok.tokens, sel[0]);
+  if (t) selectRange(t.start, t.end);
+  renderInspector();
+});
+
+line.addEventListener('mousemove', e => {
+  const el = e.target.closest ? e.target.closest('.tk') : null;
+  for (const n of line.querySelectorAll('.tk.hot')) n.classList.remove('hot');
+  if (el) el.classList.add('hot');
+});
+line.addEventListener('mouseleave', () => {
+  for (const n of line.querySelectorAll('.tk.hot')) n.classList.remove('hot');
+});
+
+/** Every range worth snapping a selection to, small to large. */
+function candidates() {
+  const out = [];
+  if (!tok.ok) return out;
+  for (const t of tok.tokens) if (!isPunct(t.role)) out.push([t.start, t.end]);
+  // a whole parameter, key=value together
+  const byIndex = new Map();
+  for (const t of tok.tokens) {
+    if (t.group !== 'query' || isPunct(t.role)) continue;
+    const cur = byIndex.get(t.index) || [t.start, t.end];
+    byIndex.set(t.index, [Math.min(cur[0], t.start), Math.max(cur[1], t.end)]);
+  }
+  for (const r of byIndex.values()) out.push(r);
+  for (const g of ['origin', 'path', 'query', 'hash']) {
+    const r = groupRange(tok.tokens, g);
+    if (r) out.push([r.start, r.end]);
+  }
+  out.push([0, text.length]);
+  return out.sort((a, b) => (a[1] - a[0]) - (b[1] - b[0]));
+}
+
+// Growing remembers where it came from, so shrinking walks back down the
+// same path instead of guessing which sub-range the user meant.
+let growStack = [];
+
+function grow() {
+  const sel = offsetsOf(); if (!sel) return;
+  const next = candidates().find(([s, e]) =>
+    s <= sel[0] && e >= sel[1] && (e - s) > (sel[1] - sel[0]));
+  if (!next) return;
+  growStack.push(sel);
+  selectRange(next[0], next[1]);
+  renderInspector();
+}
+
+function shrink() {
+  const sel = offsetsOf(); if (!sel) return;
+  const back = growStack.pop();
+  if (back && back[0] >= sel[0] && back[1] <= sel[1]) {
+    selectRange(back[0], back[1]);
+  } else {
+    // No history: fall back to the largest range inside the selection that
+    // still covers its middle, so the caret does not jump across the URL.
+    const mid = (sel[0] + sel[1]) / 2;
+    const inner = candidates().filter(([s, e]) =>
+      s >= sel[0] && e <= sel[1] && (e - s) < (sel[1] - sel[0]) && s <= mid && e >= mid);
+    const best = inner[inner.length - 1];
+    if (best) selectRange(best[0], best[1]);
+  }
+  renderInspector();
+}
+
+function hop(dir) {
+  const sel = offsetsOf(); if (!sel || !tok.ok) return;
+  const parts = tok.tokens.filter(t => !isPunct(t.role));
+  const next = dir > 0
+    ? parts.find(t => t.start > sel[0])
+    : [...parts].reverse().find(t => t.start < sel[0]);
+  if (next) selectRange(next.start, next.end);
+  renderInspector();
+}
+
+line.addEventListener('keydown', e => {
+  if (e.altKey && e.key === 'ArrowUp') { e.preventDefault(); grow(); }
+  else if (e.altKey && e.key === 'ArrowDown') { e.preventDefault(); shrink(); }
+  else if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); hop(1); }
+  else if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); hop(-1); }
+  else if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); apply(); }
+  else if (e.key === 'Enter') { e.preventDefault(); apply(); }
+});
+
+document.addEventListener('selectionchange', () => {
+  if (document.activeElement === line) renderInspector();
+});
+
+// --- inspector actions -------------------------------------------------
+
+$('inspector').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const act = btn.dataset.act;
+  const sel = offsetsOf();
+  const t = inspectorToken;
+
+  if (act === 'copy-sel' && sel) copy(text.slice(sel[0], sel[1]));
+  else if (act === 'del-parts' && sel) {
+    deleteTokens(tokensIn(tok.tokens, sel[0], sel[1]).filter(x => !isPunct(x.role)));
+  } else if (!t) return;
+  else if (act === 'select') selectRange(t.start, t.end);
+  else if (act === 'copy-plain') copy(peel(t.raw).at(-1).text);
+  else if (act === 'copy-raw') copy(t.raw);
+  else if (act === 'del') deleteTokens([t]);
+  else if (act === 'commit') commitPart(t, $('insp-edit').value);
+});
+
+$('inspector').addEventListener('keydown', e => {
+  if (e.target.id !== 'insp-edit') return;
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    if (inspectorToken) commitPart(inspectorToken, e.target.value);
+  }
+});
+
+$('map').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-group]');
+  if (!btn || !tok.ok) return;
+  const r = groupRange(tok.tokens, btn.dataset.group);
+  if (!r) { flash('This URL has no ' + btn.dataset.group + '.', true); return; }
+  selectRange(r.start, r.end);
+  renderInspector();
+});
+
+// --- chrome ------------------------------------------------------------
+
+// navigator.clipboard is unavailable in an opaque origin, which is what an
+// embedded review frame is, so fall back to the old selection trick before
+// telling the user it failed.
+function copy(s) {
+  const done = () => flash('Copied: ' + (s.length > 38 ? s.slice(0, 38) + '…' : s));
+  const legacy = () => {
+    const ta = document.createElement('textarea');
+    ta.value = s;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+    document.body.append(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    ta.remove();
+    ok ? done() : flash('Clipboard blocked here - open this prototype in its own tab.', true);
+  };
+  if (!navigator.clipboard) { legacy(); return; }
+  navigator.clipboard.writeText(s).then(done, legacy);
+}
+
+let toastTimer = null;
+function flash(msg, bad) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.toggle('err', !!bad);
+  el.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 2200);
+}
+
+function apply() {
+  if (text === baseText) return;
+  baseText = text;
+  baseTok = tokenize(baseText);
+  renderLine();
+  renderChrome();
+  renderInspector();
+  flash('Applied - the tab would navigate here.');
+}
+
+$('apply-btn').onclick = apply;
+$('new-btn').onclick = () => flash('Would open a new tab at the edited URL.');
+$('revert-btn').onclick = () => { setText(baseText, [0, 0]); flash('Reverted.'); };
+
+for (const btn of document.querySelectorAll('[data-sample]')) {
+  btn.onclick = () => {
+    for (const b of document.querySelectorAll('[data-sample]')) b.setAttribute('aria-pressed', 'false');
+    btn.setAttribute('aria-pressed', 'true');
+    baseText = SAMPLES[btn.dataset.sample];
+    baseTok = tokenize(baseText);
+    setText(baseText, null);
+  };
+}
+
+setText(text, null);
+renderInspector();
+
+</script>
+</body>
+</html>

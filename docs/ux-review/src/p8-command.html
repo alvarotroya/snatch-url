@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Snatch URL · H · Command Bar</title>
+<link rel="stylesheet" href="proto.css">
+<style>
+/* --- H: one input drives everything ---------------------------------- */
+
+/* The URL, horizontal, coloured by role, sectioned. It is a reading surface
+   with a cursor, not an editor: the command input below is where hands go. */
+#url-wrap {
+  padding: 8px 12px 6px;
+  flex-shrink: 0;
+}
+#url {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  background: var(--crust);
+  border: 1px solid var(--surface0);
+  border-radius: 6px;
+  padding: 6px 8px;
+  max-height: 106px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  color: var(--text);
+  user-select: text;
+  cursor: default;
+}
+#url .grp { border-radius: 2px; transition: opacity 0.12s; }
+#url .grp.hi { background: rgba(203, 166, 247, 0.10); }
+#url.scoped .grp:not(.in-scope) { opacity: 0.32; }
+#url .tk { border-radius: 2px; transition: opacity 0.12s; }
+#url.filtering .tk.part:not(.hit) { opacity: 0.32; }
+#url .tk.part { cursor: pointer; }
+#url .tk.part:hover { background: rgba(203, 166, 247, 0.12); }
+#url .tk.hit { background: rgba(203, 166, 247, 0.14); }
+#url .tk.cur { background: rgba(203, 166, 247, 0.28); box-shadow: inset 0 -2px 0 var(--mauve); }
+#url .tk.edited { box-shadow: inset 0 -2px 0 var(--staged); }
+#url .tk.cur.edited { box-shadow: inset 0 -2px 0 var(--staged), inset 0 -4px 0 rgba(203, 166, 247, 0.6); }
+#url .tk.typing { background: rgba(249, 226, 175, 0.18); box-shadow: inset 0 -2px 0 var(--staged); color: var(--staged); }
+
+/* --- section strip: one chip per portion, for the mouse ---------------- */
+#sections {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px 6px;
+  flex-shrink: 0;
+}
+#sections button {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--surface0);
+  border-radius: 999px;
+  color: var(--muted);
+  padding: 2px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+#sections button .n { font-family: var(--mono); color: var(--surface2); font-size: 10px; }
+#sections button:hover { background: var(--surface0); color: var(--text); }
+#sections button[aria-pressed="true"] { border-color: var(--mauve); color: var(--mauve); }
+#sections button[data-scope="@"][aria-pressed="true"] { border-color: var(--mauve); color: var(--mauve); }
+#sections button[data-scope="/"][aria-pressed="true"] { border-color: var(--peach); color: var(--peach); }
+#sections button[data-scope="?"][aria-pressed="true"] { border-color: var(--blue); color: var(--blue); }
+#sections button[data-scope="#"][aria-pressed="true"] { border-color: var(--teal); color: var(--teal); }
+#sections .sec-hint { margin-left: auto; font-size: 10px; color: var(--surface2); }
+
+/* --- the command input --------------------------------------------------- */
+#cmd-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 12px;
+  padding: 0 8px 0 8px;
+  background: var(--mantle);
+  border: 1px solid var(--surface1);
+  border-radius: 6px;
+  flex-shrink: 0;
+  height: 36px;
+}
+#cmd-wrap:focus-within { border-color: var(--mauve); box-shadow: 0 0 0 1px var(--mauve); }
+#cmd-wrap.editing { border-color: var(--staged); box-shadow: 0 0 0 1px var(--staged); }
+#cmd-wrap.inside { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal); }
+.cmd-prefix {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mauve);
+  background: var(--surface0);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cmd-prefix:empty { display: none; }
+.cmd-prefix.edit { color: var(--staged); }
+.cmd-prefix.inside { color: var(--teal); }
+#cmd {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  height: 100%;
+  caret-color: var(--mauve);
+}
+#cmd::placeholder { color: var(--surface2); }
+#cmd::selection { background: #4c4f6a; color: #fff; }
+#cmd-count { font-size: 10px; color: var(--surface2); white-space: nowrap; flex-shrink: 0; font-family: var(--mono); }
+
+/* --- the result list --------------------------------------------------- */
+#panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 12px 4px;
+}
+#hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 10px;
+  font-size: 10px;
+  color: var(--surface2);
+  padding: 0 2px 6px;
+  flex-shrink: 0;
+}
+#hints kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--surface0);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+#results {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border-radius: 6px;
+}
+.res {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  min-height: 26px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+.res:hover { background: rgba(49, 50, 68, 0.6); }
+.res.active { background: var(--surface0); border-left-color: var(--mauve); }
+.res-role {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--surface2);
+  width: 46px;
+  flex-shrink: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.res.active .res-role { color: var(--muted); }
+.res-text {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.res-text b.m { font-weight: 700; color: var(--text); text-decoration: underline; text-decoration-color: var(--mauve); text-underline-offset: 2px; }
+.res-text.cmd { font-family: inherit; font-size: 12.5px; color: var(--text); }
+.res-text .r-eq { color: var(--surface2); }
+.res.edited .res-text { box-shadow: none; }
+.res .flag { font-size: 9px; color: var(--staged); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-transform: uppercase; letter-spacing: 0.06em; }
+.res .badge { flex-shrink: 0; }
+.res-hint { font-size: 10px; color: var(--surface2); white-space: nowrap; flex-shrink: 0; }
+.res-acts { display: none; gap: 2px; flex-shrink: 0; }
+.res.active .res-acts { display: inline-flex; }
+.res-acts .act {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 0 4px;
+  cursor: pointer;
+}
+.res-acts .act:hover { border-color: var(--surface2); color: var(--text); }
+.res-acts .act.danger:hover { color: var(--red); border-color: var(--red); }
+.res-empty { font-size: 12px; color: var(--surface2); padding: 10px 8px; line-height: 1.6; }
+
+/* --- look inside: the decode stack ------------------------------------- */
+#inside {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border-radius: 6px;
+}
+.in-head { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); padding: 2px 8px 6px; }
+.in-head b { color: var(--text); font-family: var(--mono); }
+.layer { padding: 4px 8px 6px; border-radius: 5px; border-left: 2px solid transparent; cursor: pointer; }
+.layer.active { background: var(--surface0); border-left-color: var(--teal); }
+.layer-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--surface2);
+  margin-bottom: 2px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.layer.active .layer-label { color: var(--muted); }
+.layer-label .spacer { flex: 1; }
+.layer pre {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  background: var(--crust);
+  border-radius: 4px;
+  padding: 5px 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 110px;
+  overflow: auto;
+}
+.layer.last pre { color: var(--text); }
+
+/* --- recent actions with undo -------------------------------------------- */
+#recent {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  font-size: 10px;
+  color: var(--surface2);
+  flex-shrink: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+#recent .undo {
+  font: inherit;
+  font-family: var(--mono);
+  background: transparent;
+  border: 1px solid var(--surface0);
+  border-radius: 999px;
+  color: var(--muted);
+  padding: 1px 7px;
+  cursor: pointer;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#recent .undo:hover { border-color: var(--staged); color: var(--staged); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="demo-bar">
+    <span class="demo-tag">demo url</span>
+    <button data-sample="short">short</button>
+    <button data-sample="typical" aria-pressed="true">typical</button>
+    <button data-sample="monster">monster</button>
+    <span class="spacer"></span>
+    <span>440 × 600</span>
+  </div>
+
+  <header>
+    <h1>Snatch URL</h1>
+    <span class="variant">H · Command Bar</span>
+  </header>
+
+  <div id="url-wrap">
+    <div id="url" aria-label="The URL, coloured by part"></div>
+  </div>
+
+  <div id="sections">
+    <button data-scope="@" title="Scope to the host (@)">host</button>
+    <button data-scope="/" title="Scope to the path (/)">path <span class="n" id="n-path"></span></button>
+    <button data-scope="?" title="Scope to the query (?)">query <span class="n" id="n-query"></span></button>
+    <button data-scope="#" title="Scope to the fragment (#)">#</button>
+    <span class="sec-hint" id="sec-hint">click to scope</span>
+  </div>
+
+  <div id="cmd-wrap">
+    <span class="cmd-prefix" id="cmd-prefix"></span>
+    <input id="cmd" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+      placeholder="find a part, or name=value" aria-label="Command" autofocus>
+    <span id="cmd-count"></span>
+  </div>
+
+  <div id="panel">
+    <div id="hints"></div>
+    <div id="results" role="listbox" aria-label="Matching parts"></div>
+    <div id="inside" class="hidden"></div>
+  </div>
+
+  <div id="recent" class="hidden"></div>
+
+  <div class="keys">
+    <span><kbd>↑↓</kbd> move</span>
+    <span><kbd>⏎</kbd> edit</span>
+    <span><kbd>⇧⏎</kbd> name</span>
+    <span><kbd>⌘C</kbd> copy</span>
+    <span><kbd>⌘⇧C</kbd> plain</span>
+    <span><kbd>⌘⌫</kbd> delete</span>
+    <span><kbd>→</kbd> inside</span>
+    <span><kbd>⌘Z</kbd> undo</span>
+    <span><kbd>esc</kbd> clear</span>
+  </div>
+
+  <div class="status-bar" id="status-bar">
+    <span class="change-summary" id="change-summary" role="status">No unapplied changes</span>
+    <button class="btn" id="revert-btn" disabled>Revert</button>
+    <button class="btn" id="new-btn" disabled>New tab</button>
+    <button class="btn btn-primary" id="apply-btn" disabled>Apply</button>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+</div>
+
+<script type="module">
+import {
+  SAMPLES, tokenize, groupRange, encodeFor, spliceRaw, peel, badgeFor,
+  countChanges, ROLE_LABEL, isPunct,
+} from './proto-core.js?v=2';
+
+const $ = id => document.getElementById(id);
+const cmd = $('cmd');
+
+// --- state --------------------------------------------------------------
+
+let baseText = '';
+let baseTok = null;
+let text = '';
+let tok = null;
+let parts = [];            // the touchable units, in URL order
+let changedParts = new Set();
+
+let mode = 'search';       // 'search' | 'edit' | 'inside'
+let activeId = null;       // id of the highlighted result
+let editing = null;        // { part, token, field, prev }
+let insideOf = null;       // { part, layers, idx }
+let history = [];          // [{ label, before }], newest last
+let results = [];          // what the list currently shows
+
+const SCOPE_GROUP = { '@': 'origin', '/': 'path', '?': 'query', '#': 'hash' };
+const SCOPE_NAME = { '@': 'host', '/': 'path', '?': 'query', '#': 'fragment', '>': 'commands' };
+
+// --- parts: the touchable units ------------------------------------------
+//
+// A part is what the list shows and the cursor moves over: the host, the
+// port, one segment, one parameter (name AND value, one unit), the fragment.
+// It carries the tokens it is made of, so highlighting and deleting can take
+// the punctuation with them.
+
+function buildParts(tokens) {
+  const out = [];
+  for (const t of tokens) {
+    if (t.role === 'host') {
+      out.push({ id: 'host', kind: 'host', group: 'origin', main: t, tokens: [t], search: t.text, bag: `host\0${t.raw}` });
+    } else if (t.role === 'port') {
+      out.push({ id: 'port', kind: 'port', group: 'origin', main: t, tokens: [t], search: t.raw.slice(1), bag: `port\0${t.raw}` });
+    } else if (t.role === 'seg') {
+      out.push({ id: `seg-${t.index}`, kind: 'seg', group: 'path', main: t, tokens: [t], search: t.text, bag: `seg\0${t.raw}` });
+    } else if (t.role === 'key') {
+      const i = tokens.indexOf(t);
+      const eq = tokens[i + 1] && tokens[i + 1].role === 'eq' ? tokens[i + 1] : null;
+      const val = eq && tokens[i + 2] && tokens[i + 2].role === 'val' ? tokens[i + 2] : null;
+      out.push({
+        id: `param-${t.index}`, kind: 'param', group: 'query',
+        key: t, val, main: val || t,
+        tokens: val ? [t, eq, val] : [t],
+        search: val ? `${t.text}=${val.text}` : t.text,
+        bag: `param\0${t.raw}\0${val ? val.raw : null}`,
+      });
+    } else if (t.role === 'hash') {
+      out.push({ id: 'hash', kind: 'hash', group: 'hash', main: t, tokens: [t], search: t.text, bag: `hash\0${t.raw}` });
+    }
+  }
+  return out;
+}
+
+/** Parts that are not in the base URL, as a multiset diff (survives deletes). */
+function diffParts(base, work) {
+  const bag = new Map();
+  for (const p of base) bag.set(p.bag, (bag.get(p.bag) || 0) + 1);
+  const changed = new Set();
+  for (const p of work) {
+    const n = bag.get(p.bag) || 0;
+    if (n > 0) bag.set(p.bag, n - 1); else changed.add(p.id);
+  }
+  return changed;
+}
+
+function partLabel(p) {
+  if (p.kind === 'seg') return `seg ${p.main.index + 1}`;
+  if (p.kind === 'param') return p.val ? `param ${p.key.index + 1}` : 'flag';
+  if (p.kind === 'hash') return '#';
+  return p.kind;
+}
+
+function partName(p) {
+  if (p.kind === 'param') return p.key.text;
+  return p.main.text;
+}
+
+// --- text: every edit is a splice -----------------------------------------
+
+function load(url) {
+  baseText = url;
+  baseTok = tokenize(url);
+  setText(url);
+}
+
+function setText(next) {
+  text = next;
+  tok = tokenize(text);
+  parts = tok.ok ? buildParts(tok.tokens) : [];
+  changedParts = tok.ok ? diffParts(buildParts(baseTok.tokens), parts) : new Set();
+}
+
+/** Commit a new URL string. Rejects anything the model cannot parse. */
+function commit(next, label) {
+  if (next === text) return true;
+  const probe = tokenize(next);
+  if (!probe.ok) { flash(probe.error, true); return false; }
+  history.push({ label, before: text });
+  if (history.length > 20) history.shift();
+  setText(next);
+  return true;
+}
+
+/** The range a part occupies once its punctuation goes with it. */
+function rangeToDelete(p) {
+  const all = tok.tokens;
+  let from = p.tokens[0].start;
+  let to = p.tokens[p.tokens.length - 1].end;
+  if (p.kind === 'seg') {
+    const before = all[all.indexOf(p.main) - 1];
+    if (before && before.role === 'sep') from = before.start;
+  } else if (p.kind === 'param') {
+    const before = all[all.indexOf(p.tokens[0]) - 1];
+    const after = all[all.indexOf(p.tokens[p.tokens.length - 1]) + 1];
+    if (before && before.role === 'amp') from = before.start;
+    else if (after && after.role === 'amp') to = after.end;
+    else if (before && before.role === 'qmark') from = before.start;
+  }
+  return [from, to];
+}
+
+function deleteParts(list, label) {
+  if (list.length === 0) return;
+  const ranges = list.map(rangeToDelete).sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  for (const r of ranges) {
+    const last = merged[merged.length - 1];
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+    else merged.push([...r]);
+  }
+  let next = text;
+  for (const [from, to] of [...merged].reverse()) next = spliceRaw(next, from, to, '');
+  commit(next, label);
+}
+
+function deletePart(p) {
+  if (p.kind === 'host') { flash('The host stays - retype it instead.', true); return; }
+  const idx = results.findIndex(r => r.id === activeId);
+  if (!deleteParts([p], `deleted ${p.search}`)) return;
+  renderAll();
+  // The cursor lands on what is now in the deleted part's place.
+  const nextRes = results[Math.min(idx, results.length - 1)];
+  activeId = nextRes ? nextRes.id : null;
+  renderAll();
+  flash(`Deleted ${short(p.search)}`);
+}
+
+function addParam(name, value) {
+  const raw = encodeFor('key', name) + (value === null ? '' : '=' + encodeFor('val', value));
+  const q = groupRange(tok.tokens, 'query');
+  const h = groupRange(tok.tokens, 'hash');
+  const next = q
+    ? spliceRaw(text, q.end, q.end, '&' + raw)
+    : spliceRaw(text, h ? h.start : text.length, h ? h.start : text.length, '?' + raw);
+  if (!commit(next, `added ${name}`)) return;
+  cmd.value = '';
+  activeId = `param-${parts.length ? Math.max(...parts.filter(p => p.kind === 'param').map(p => p.key.index)) + 1 : 0}`;
+  renderAll();
+  activeId = results.length ? results[results.length - 1].id : null;
+  renderAll();
+  flash(`Added ${name}${value === null ? '' : '=' + short(value)}`);
+}
+
+function setParamValue(p, value) {
+  const raw = encodeFor('val', value);
+  const next = p.val
+    ? spliceRaw(text, p.val.start, p.val.end, raw)
+    : spliceRaw(text, p.key.end, p.key.end, '=' + raw);
+  if (!commit(next, `set ${p.key.text}`)) return;
+  cmd.value = '';
+  activeId = p.id;
+  renderAll();
+  flash(`${p.key.text} = ${short(value)}`);
+}
+
+function appendSegment(seg) {
+  const raw = encodeFor('seg', seg.trim());
+  if (!raw) return;
+  const segs = tok.tokens.filter(t => t.role === 'seg');
+  const at = segs.length ? segs[segs.length - 1].end : tok.tokens.find(t => t.group === 'path').end;
+  const next = segs.length ? spliceRaw(text, at, at, '/' + raw) : spliceRaw(text, at, at, raw);
+  if (!commit(next, `appended /${seg}`)) return;
+  cmd.value = '';
+  activeId = `seg-${segs.length}`;
+  renderAll();
+  flash(`Appended /${short(seg)}`);
+}
+
+function setFragment(frag) {
+  const h = groupRange(tok.tokens, 'hash');
+  const raw = frag === '' ? '' : encodeFor('hash', frag);
+  const next = h ? spliceRaw(text, h.start, h.end, raw) : spliceRaw(text, text.length, text.length, raw);
+  if (!commit(next, frag === '' ? 'cleared fragment' : `set #${frag}`)) return;
+  cmd.value = '';
+  activeId = 'hash';
+  renderAll();
+  flash(frag === '' ? 'Fragment cleared' : `Fragment set to ${short(frag)}`);
+}
+
+function setHost(host) {
+  const t = tok.tokens.find(x => x.role === 'host');
+  const next = spliceRaw(text, t.start, t.end, host.trim());
+  if (!commit(next, `host → ${host}`)) return;
+  cmd.value = '';
+  activeId = 'host';
+  renderAll();
+  flash(`Host is now ${short(host)}`);
+}
+
+function undo(n = 1) {
+  if (history.length === 0) { flash('Nothing to undo.', true); return; }
+  let entry = null;
+  for (let i = 0; i < n && history.length; i += 1) entry = history.pop();
+  setText(entry.before);
+  renderAll();
+  flash(`Undid: ${short(entry.label)}`);
+}
+
+// --- the command language ---------------------------------------------------
+
+function parseInput(v) {
+  const m = /^([>?/#@])\s?([\s\S]*)$/.exec(v);
+  if (m) return { prefix: m[1], q: m[2] };
+  return { prefix: '', q: v };
+}
+
+/**
+ * fzf-lite: a substring wins, a tight subsequence is allowed, anything
+ * spread thin is not a match. Returns matched character positions.
+ */
+function fuzzy(q, s) {
+  if (!q) return { score: 0, idx: [] };
+  const ql = q.toLowerCase();
+  const sl = s.toLowerCase();
+  const at = sl.indexOf(ql);
+  if (at !== -1) {
+    const wordStart = at === 0 || /[^a-z0-9]/.test(sl[at - 1]);
+    return { score: 200 + (wordStart ? 20 : 0) - Math.min(at, 50), idx: Array.from({ length: ql.length }, (_, i) => at + i) };
+  }
+  const idx = [];
+  let i = 0;
+  for (let j = 0; j < sl.length && i < ql.length; j += 1) {
+    if (sl[j] === ql[i]) { idx.push(j); i += 1; }
+  }
+  if (i < ql.length) return null;
+  const span = idx[idx.length - 1] - idx[0] + 1;
+  if (span > ql.length * 2 + 2) return null;
+  return { score: 100 - (span - ql.length) * 4 - Math.min(idx[0], 30), idx };
+}
+
+const COMMANDS = [
+  { id: 'copy-url', label: 'Copy URL', hint: 'as edited', run: () => copy(text) },
+  { id: 'copy-url-plain', label: 'Copy URL decoded', hint: 'every part percent-decoded', run: () => copy(tok.tokens.map(t => t.text).join('')) },
+  { id: 'copy-query', label: 'Copy query', hint: 'without the ?', when: () => !!groupRange(tok.tokens, 'query'),
+    run: () => { const g = groupRange(tok.tokens, 'query'); copy(text.slice(g.start + 1, g.end)); } },
+  { id: 'copy-path', label: 'Copy path', when: () => !!groupRange(tok.tokens, 'path'),
+    run: () => { const g = groupRange(tok.tokens, 'path'); copy(text.slice(g.start, g.end)); } },
+  { id: 'copy-host', label: 'Copy host', run: () => copy(tok.tokens.find(t => t.role === 'host').raw) },
+  { id: 'clear-query', label: 'Clear query', hint: 'drop every parameter', when: () => !!groupRange(tok.tokens, 'query'),
+    run: () => { deleteParts(parts.filter(p => p.kind === 'param'), 'cleared query'); renderAll(); flash('Query cleared'); } },
+  { id: 'strip-utm', label: 'Strip tracking', hint: 'utm_*, fbclid, gclid', when: () => parts.some(isTracking),
+    run: () => { const n = parts.filter(isTracking).length; deleteParts(parts.filter(isTracking), 'stripped tracking'); renderAll(); flash(`Removed ${n} tracking param${n === 1 ? '' : 's'}`); } },
+  { id: 'sort-params', label: 'Sort params by name', when: () => parts.filter(p => p.kind === 'param').length > 1,
+    run: () => {
+      const g = groupRange(tok.tokens, 'query');
+      const chunks = parts.filter(p => p.kind === 'param').map(p => text.slice(p.tokens[0].start, p.tokens[p.tokens.length - 1].end));
+      const keyed = parts.filter(p => p.kind === 'param').map((p, i) => [p.key.text, i]).sort((a, b) => a[0].localeCompare(b[0]) || a[1] - b[1]);
+      commit(spliceRaw(text, g.start, g.end, '?' + keyed.map(([, i]) => chunks[i]).join('&')), 'sorted params');
+      renderAll(); flash('Params sorted');
+    } },
+  { id: 'clear-hash', label: 'Clear fragment', when: () => !!groupRange(tok.tokens, 'hash'),
+    run: () => setFragment('') },
+  { id: 'add-param', label: 'Add param…', hint: 'then type name=value', run: () => { setInput('? '); flash('Type name=value and press Enter'); } },
+  { id: 'scope-query', label: 'Select the query', hint: '? ', run: () => setInput('? ') },
+  { id: 'scope-path', label: 'Select the path', hint: '/ ', run: () => setInput('/ ') },
+  { id: 'scope-host', label: 'Select the host', hint: '@ ', run: () => setInput('@ ') },
+  { id: 'scope-hash', label: 'Select the fragment', hint: '# ', run: () => setInput('# ') },
+  { id: 'undo', label: 'Undo last action', when: () => history.length > 0, run: () => { setInput(''); undo(); } },
+  { id: 'revert', label: 'Revert all changes', when: () => text !== baseText, run: () => { setInput(''); revert(); } },
+  { id: 'apply', label: 'Apply', hint: 'navigate this tab', when: () => text !== baseText, run: () => { setInput(''); apply(); } },
+  { id: 'new-tab', label: 'Apply in new tab', when: () => text !== baseText, run: () => { setInput(''); flash('Would open a new tab at the edited URL.'); } },
+];
+
+function isTracking(p) {
+  return p.kind === 'param' && /^(utm_|fbclid$|gclid$|mc_cid$|mc_eid$|ref_src$)/i.test(p.key.text);
+}
+
+/** Everything the list should show for the current input. */
+function computeResults() {
+  const { prefix, q } = parseInput(cmd.value);
+  const out = [];
+
+  if (prefix === '>') {
+    for (const c of COMMANDS) {
+      if (c.when && !c.when()) continue;
+      const m = fuzzy(q, c.label);
+      if (!m) continue;
+      out.push({ id: `cmd-${c.id}`, kind: 'cmd', cmd: c, match: m, run: c.run });
+    }
+    out.sort((a, b) => b.match.score - a.match.score);
+    return out;
+  }
+
+  // name=value at the root or under ? adds a parameter - or replaces one
+  // that exists, which makes the input the fastest edit path there is.
+  const eq = (prefix === '' || prefix === '?') ? q.indexOf('=') : -1;
+  const setForm = eq > 0 ? { name: q.slice(0, eq), value: q.slice(eq + 1) } : null;
+  const needle = setForm ? setForm.name : q;
+
+  if (setForm) {
+    const existing = parts.filter(p => p.kind === 'param' && p.key.text === setForm.name);
+    for (const p of existing) {
+      out.push({
+        id: `set-${p.id}`, kind: 'set', part: p, name: setForm.name, value: setForm.value,
+        run: () => setParamValue(p, setForm.value),
+      });
+    }
+    out.push({ id: 'add-param', kind: 'add', name: setForm.name, value: setForm.value, run: () => addParam(setForm.name, setForm.value) });
+  }
+
+  const group = SCOPE_GROUP[prefix] || null;
+  const hits = [];
+  let exact = false;
+  for (const p of parts) {
+    if (group && p.group !== group) continue;
+    const m = fuzzy(needle, p.search) || (needle ? fuzzy(needle, p.main.raw) : null);
+    if (!m) continue;
+    if (m.score >= 200) exact = true;
+    hits.push({ id: p.id, kind: 'part', part: p, match: m });
+  }
+  if (needle) hits.sort((a, b) => b.match.score - a.match.score);
+  out.push(...hits);
+
+  // A scoped search that finds nothing offers to make it.
+  if (q && !exact && !setForm) {
+    if (prefix === '/') out.push({ id: 'add-seg', kind: 'add', name: q, run: () => appendSegment(q) });
+    else if (prefix === '#') out.push({ id: 'set-hash', kind: 'add', name: q, run: () => setFragment(q) });
+    else if (prefix === '@') out.push({ id: 'set-host', kind: 'add', name: q, run: () => setHost(q) });
+  }
+  return out;
+}
+
+function setInput(v) {
+  mode = 'search';
+  editing = null;
+  insideOf = null;
+  cmd.value = v;
+  activeId = null;
+  renderAll();
+  cmd.focus();
+}
+
+// --- render -------------------------------------------------------------------
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+function short(s) {
+  return s.length > 34 ? s.slice(0, 34) + '…' : s;
+}
+
+function partOfToken(t) {
+  return parts.find(p => p.tokens.includes(t)) || null;
+}
+
+function renderUrl(preview) {
+  const el = $('url');
+  const src = preview ? preview.tok : tok;
+  if (!src || !src.ok) { el.textContent = text; return; }
+
+  const { prefix, q } = parseInput(cmd.value);
+  const scopeGroup = mode === 'search' ? SCOPE_GROUP[prefix] || null : null;
+  const filtering = mode === 'search' && q !== '' && prefix !== '>';
+  const hitIds = new Set(filtering ? results.filter(r => r.kind === 'part').map(r => r.id) : []);
+  const activePart = results.find(r => r.id === activeId);
+  const activePartId = activePart && activePart.kind === 'part' ? activePart.id : activePart && activePart.kind === 'set' ? activePart.part.id : null;
+
+  el.classList.toggle('scoped', !!scopeGroup);
+  el.classList.toggle('filtering', filtering);
+
+  let html = '';
+  let openGroup = null;
+  const srcParts = preview ? buildParts(src.tokens) : parts;
+  for (const t of src.tokens) {
+    if (t.group !== openGroup) {
+      if (openGroup) html += '</span>';
+      openGroup = t.group;
+      html += `<span class="grp grp-${t.group}${scopeGroup === t.group ? ' in-scope' : ''}" data-group="${t.group}">`;
+    }
+    const p = preview ? srcParts.find(x => x.tokens.includes(t)) : partOfToken(t);
+    const cls = ['tk', `r-${t.role}`];
+    if (p) {
+      cls.push('part');
+      if (hitIds.has(p.id)) cls.push('hit');
+      if (p.id === activePartId) cls.push('cur');
+      if (changedParts.has(p.id) && !preview) cls.push('edited');
+    }
+    if (preview && t.start === preview.at) cls.push('typing');
+    html += `<span class="${cls.join(' ')}"${p ? ` data-part="${p.id}"` : ''}>${escapeHtml(t.raw)}</span>`;
+  }
+  if (openGroup) html += '</span>';
+  el.innerHTML = html;
+
+  const cur = el.querySelector('.tk.cur, .tk.typing');
+  if (cur) cur.scrollIntoView({ block: 'nearest' });
+}
+
+function matchedHtml(pieces, idx) {
+  // pieces: [{ role, text }] laid end to end; idx: matched positions in the join.
+  const set = new Set(idx);
+  let pos = 0;
+  let html = '';
+  for (const piece of pieces) {
+    let run = '';
+    let inMatch = false;
+    let out = '';
+    for (const ch of piece.text) {
+      const m = set.has(pos);
+      if (m !== inMatch) { out += inMatch ? `<b class="m">${escapeHtml(run)}</b>` : escapeHtml(run); run = ''; inMatch = m; }
+      run += ch;
+      pos += 1;
+    }
+    out += inMatch ? `<b class="m">${escapeHtml(run)}</b>` : escapeHtml(run);
+    html += `<span class="r-${piece.role}">${out}</span>`;
+  }
+  return html;
+}
+
+function partPieces(p) {
+  if (p.kind === 'param') {
+    return p.val
+      ? [{ role: 'key', text: p.key.text }, { role: 'eq', text: '=' }, { role: 'val', text: p.val.text }]
+      : [{ role: 'key', text: p.key.text }];
+  }
+  return [{ role: p.main.role, text: p.search }];
+}
+
+function actsHtml(r) {
+  if (r.kind === 'cmd') return '<span class="res-acts"><button class="act" data-act="run">⏎ run</button></span>';
+  if (r.kind === 'add') return '<span class="res-acts"><button class="act" data-act="run">⏎ add</button></span>';
+  if (r.kind === 'set') return '<span class="res-acts"><button class="act" data-act="run">⏎ set</button></span>';
+  const p = r.part;
+  const b = [`<button class="act" data-act="edit">⏎ ${p.kind === 'param' && p.val ? 'value' : 'edit'}</button>`];
+  if (p.kind === 'param' && p.val) b.push('<button class="act" data-act="name">⇧⏎ name</button>');
+  b.push('<button class="act" data-act="copy">⌘C</button>');
+  if (p.kind !== 'host') b.push('<button class="act danger" data-act="del">⌘⌫</button>');
+  if (badgeFor(p.main.raw)) b.push('<button class="act" data-act="inside">→ inside</button>');
+  return `<span class="res-acts">${b.join('')}</span>`;
+}
+
+function renderResults() {
+  results = computeResults();
+  if (!results.some(r => r.id === activeId)) activeId = results.length ? results[0].id : null;
+
+  const box = $('results');
+  const { prefix, q } = parseInput(cmd.value);
+
+  $('hints').innerHTML = (cmd.value === '' && mode === 'search')
+    ? '<span><kbd>&gt;</kbd> commands</span><span><kbd>?</kbd> query</span><span><kbd>/</kbd> path</span>'
+      + '<span><kbd>#</kbd> fragment</span><span><kbd>@</kbd> host</span><span><kbd>name=value</kbd> add or set</span>'
+    : '';
+
+  if (results.length === 0) {
+    box.innerHTML = `<div class="res-empty">${prefix === '>' ? 'No such command.' : q ? `Nothing matches <b>${escapeHtml(q)}</b>${prefix === '' ? ' - type <b>name=value</b> to add a param.' : '.'}` : `Nothing in the ${SCOPE_NAME[prefix] || 'URL'}.`}</div>`;
+    return;
+  }
+
+  box.innerHTML = results.map(r => {
+    const active = r.id === activeId;
+    let role = '';
+    let body = '';
+    let extra = '';
+    if (r.kind === 'cmd') {
+      role = 'cmd';
+      body = `<span class="res-text cmd">${matchedHtml([{ role: 'cmd', text: r.cmd.label }], r.match.idx)}</span>`;
+      if (r.cmd.hint) extra = `<span class="res-hint">${escapeHtml(r.cmd.hint)}</span>`;
+    } else if (r.kind === 'add') {
+      role = r.id === 'add-seg' ? 'append' : r.id === 'set-hash' || r.id === 'set-host' ? 'set' : 'add';
+      const pieces = r.id === 'add-seg' ? [{ role: 'sep', text: '/' }, { role: 'seg', text: r.name }]
+        : r.id === 'set-hash' ? [{ role: 'sep', text: '#' }, { role: 'hash', text: r.name }]
+          : r.id === 'set-host' ? [{ role: 'host', text: r.name }]
+            : [{ role: 'key', text: r.name }, { role: 'eq', text: '=' }, { role: 'val', text: r.value }];
+      body = `<span class="res-text">${matchedHtml(pieces, [])}</span>`;
+      extra = `<span class="res-hint">${r.id === 'add-param' ? 'new param' : r.id === 'add-seg' ? 'new segment' : r.id === 'set-host' ? 'replaces host' : 'replaces fragment'}</span>`;
+    } else if (r.kind === 'set') {
+      role = 'set';
+      body = `<span class="res-text">${matchedHtml([{ role: 'key', text: r.name }, { role: 'eq', text: '=' }, { role: 'val', text: r.value }], [])}</span>`;
+      extra = `<span class="res-hint">was ${escapeHtml(short(r.part.val ? r.part.val.text : '(bare)'))}</span>`;
+    } else {
+      const p = r.part;
+      role = partLabel(p);
+      body = `<span class="res-text">${matchedHtml(partPieces(p), r.match.idx)}</span>`;
+      const badge = badgeFor(p.main.raw);
+      if (changedParts.has(p.id)) extra += '<span class="flag">changed</span>';
+      if (badge) extra += `<span class="badge ${badge}">${badge === 'encoded' ? '%' : badge}</span>`;
+    }
+    return `<div class="res${active ? ' active' : ''}" role="option" aria-selected="${active}" data-id="${escapeHtml(r.id)}">`
+      + `<span class="res-role">${escapeHtml(role)}</span>${body}${extra}${active ? actsHtml(r) : ''}</div>`;
+  }).join('');
+
+  const cur = box.querySelector('.res.active');
+  if (cur) cur.scrollIntoView({ block: 'nearest' });
+}
+
+function renderInside() {
+  const box = $('inside');
+  if (mode !== 'inside' || !insideOf) { box.classList.add('hidden'); $('results').classList.remove('hidden'); return; }
+  box.classList.remove('hidden');
+  $('results').classList.add('hidden');
+  $('hints').innerHTML = '';
+  const { part, layers, idx } = insideOf;
+  box.innerHTML = `<div class="in-head">inside <b>${escapeHtml(partName(part))}</b>
+      <span class="res-hint">${layers.length === 1 ? 'nothing hidden' : `${layers.length} layers`} · ↑↓ layer · ⌘C copy · ⏎ edit · ← back</span></div>`
+    + layers.map((l, i) => `<div class="layer${i === idx ? ' active' : ''}${i === layers.length - 1 ? ' last' : ''}" data-layer="${i}">
+        <div class="layer-label">${escapeHtml(l.label)}${l.isUrl ? ' <span class="badge url">nested url</span>' : ''}${l.kind === 'json' ? ' <span class="badge json">json</span>' : ''}${l.kind === 'base64' ? ' <span class="badge base64">base64</span>' : ''}${l.kind === 'jwt' ? ' <span class="badge jwt">jwt</span>' : ''}
+          <span class="spacer"></span>${i === idx && l.isUrl ? '<span>⌘⏎ go there</span>' : ''}</div>
+        <pre>${escapeHtml(l.text)}</pre></div>`).join('');
+  const cur = box.querySelector('.layer.active');
+  if (cur) cur.scrollIntoView({ block: 'nearest' });
+}
+
+function renderSections() {
+  const { prefix } = parseInput(cmd.value);
+  for (const b of $('sections').querySelectorAll('button')) {
+    b.setAttribute('aria-pressed', mode === 'search' && prefix === b.dataset.scope ? 'true' : 'false');
+  }
+  $('n-path').textContent = parts.filter(p => p.kind === 'seg').length || '';
+  $('n-query').textContent = parts.filter(p => p.kind === 'param').length || '';
+  $('sections').querySelector('[data-scope="#"]').style.opacity = parts.some(p => p.kind === 'hash') ? '' : '0.45';
+}
+
+function renderCmd() {
+  const wrap = $('cmd-wrap');
+  const pre = $('cmd-prefix');
+  wrap.classList.toggle('editing', mode === 'edit');
+  wrap.classList.toggle('inside', mode === 'inside');
+  pre.className = 'cmd-prefix';
+  if (mode === 'edit') {
+    const { token, field } = editing;
+    pre.classList.add('edit');
+    pre.textContent = `edit ${field === 'key' ? 'name' : ROLE_LABEL[token.role]}`;
+    cmd.placeholder = '';
+    $('cmd-count').textContent = '⏎ commit · esc cancel';
+  } else if (mode === 'inside') {
+    pre.classList.add('inside');
+    pre.textContent = `inside ${partName(insideOf.part)}`;
+    $('cmd-count').textContent = '← back';
+  } else {
+    const { prefix, q } = parseInput(cmd.value);
+    pre.textContent = prefix ? SCOPE_NAME[prefix] : '';
+    cmd.placeholder = prefix === '>' ? 'command…' : prefix === '?' ? 'find a param, or name=value' : prefix ? `find in the ${SCOPE_NAME[prefix]}…` : 'find a part, or name=value';
+    const n = results.filter(r => r.kind === 'part' || r.kind === 'cmd').length;
+    $('cmd-count').textContent = q || prefix ? `${n} match${n === 1 ? '' : 'es'}` : `${parts.length} parts`;
+  }
+}
+
+function renderChrome() {
+  const n = text === baseText ? 0 : countChanges(baseText, text, baseTok.tokens, tok.tokens);
+  $('change-summary').textContent = n === 0 ? 'No unapplied changes' : `${n} unapplied change${n === 1 ? '' : 's'}`;
+  $('status-bar').classList.toggle('dirty', n > 0);
+  for (const id of ['apply-btn', 'new-btn', 'revert-btn']) $(id).disabled = n === 0;
+}
+
+function renderRecent() {
+  const box = $('recent');
+  if (history.length === 0) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  box.classList.remove('hidden');
+  const last = history.slice(-3).reverse();
+  box.innerHTML = '<span>recent</span>' + last.map((h, i) =>
+    `<button class="undo" data-n="${i + 1}" title="Undo back to before this">↶ ${escapeHtml(h.label)}</button>`).join('');
+}
+
+function renderAll() {
+  renderResults();
+  renderInside();
+  renderUrl();
+  renderSections();
+  renderCmd();
+  renderChrome();
+  renderRecent();
+}
+
+// --- type-over editing in the same input --------------------------------
+
+function startEdit(p, field) {
+  if (mode === 'inside') { mode = 'search'; insideOf = null; }
+  const token = field === 'key' ? p.key : p.main;
+  if (!token) return;
+  editing = { part: p, token, field, prev: cmd.value };
+  mode = 'edit';
+  cmd.value = token.role === 'port' ? token.raw.slice(1) : token.text;
+  renderAll();
+  renderUrl(previewFor(cmd.value));
+  cmd.focus();
+  cmd.select();                        // type-over: the whole part is armed
+}
+
+function previewFor(typed) {
+  const { token } = editing;
+  const raw = rawFor(token, typed);
+  if (raw === null) return null;
+  const next = spliceRaw(text, token.start, token.end, raw);
+  const t = tokenize(next);
+  if (!t.ok) return null;
+  return { tok: t, at: token.start };
+}
+
+function rawFor(token, typed) {
+  if (token.role === 'port') return typed === '' ? '' : ':' + typed.replace(/\D/g, '');
+  if (token.role === 'hash') return typed === '' ? '' : encodeFor('hash', typed);
+  return encodeFor(token.role, typed);
+}
+
+function commitEdit() {
+  const { part, token, field, prev } = editing;
+  const typed = cmd.value;
+  if (typed === (token.role === 'port' ? token.raw.slice(1) : token.text)) { cancelEdit(); return; }
+  if ((token.role === 'seg' || token.role === 'key' || token.role === 'host') && typed.trim() === '') {
+    flash(token.role === 'key' ? 'Key cannot be empty.' : token.role === 'seg' ? 'Segment cannot be empty.' : 'Host cannot be empty.', true);
+    return;
+  }
+  const raw = rawFor(token, typed);
+  const next = spliceRaw(text, token.start, token.end, raw);
+  const label = field === 'key' ? `renamed ${token.text}` : `set ${partName(part)}`;
+  if (!commit(next, label)) return;
+  mode = 'search';
+  editing = null;
+  cmd.value = prev;
+  activeId = part.id;
+  renderAll();
+  flash(`${ROLE_LABEL[token.role]} → ${short(typed || '(empty)')}`);
+}
+
+function cancelEdit() {
+  const { prev, part } = editing;
+  mode = 'search';
+  editing = null;
+  cmd.value = prev;
+  activeId = part.id;
+  renderAll();
+}
+
+// --- look inside --------------------------------------------------------------
+
+function openInside(p) {
+  const layers = peel(p.main.raw);
+  mode = 'inside';
+  insideOf = { part: p, layers, idx: layers.length - 1 };
+  renderAll();
+  cmd.focus();
+}
+
+function closeInside() {
+  const p = insideOf ? insideOf.part : null;
+  mode = 'search';
+  insideOf = null;
+  if (p) activeId = p.id;
+  renderAll();
+  cmd.focus();
+}
+
+// --- actions on the highlighted result ---------------------------------------
+
+function active() {
+  return results.find(r => r.id === activeId) || null;
+}
+
+function activePart() {
+  const r = active();
+  if (!r) return null;
+  if (r.kind === 'part') return r.part;
+  if (r.kind === 'set') return r.part;
+  return null;
+}
+
+function copyPart(p, plain) {
+  if (!p) return;
+  let s;
+  if (p.kind === 'param') s = plain ? (p.val ? peel(p.val.raw)[peel(p.val.raw).length - 1].text : p.key.text) : text.slice(p.tokens[0].start, p.tokens[p.tokens.length - 1].end);
+  else if (p.kind === 'hash') s = plain ? p.main.text : p.main.raw.slice(1);
+  else if (p.kind === 'port') s = p.main.raw.slice(1);
+  else s = plain ? peel(p.main.raw)[peel(p.main.raw).length - 1].text : p.main.raw;
+  copy(s);
+}
+
+function runResult(r, opts = {}) {
+  if (!r) return;
+  if (r.kind === 'part') startEdit(r.part, opts.name && r.part.kind === 'param' && r.part.val ? 'key' : 'main');
+  else r.run();
+}
+
+function move(step) {
+  if (results.length === 0) return;
+  const i = results.findIndex(r => r.id === activeId);
+  const next = results[Math.max(0, Math.min(results.length - 1, (i === -1 ? 0 : i) + step))];
+  activeId = next.id;
+  renderResults();
+  renderUrl();
+  renderCmd();
+}
+
+// --- keyboard ---------------------------------------------------------------------
+
+cmd.addEventListener('input', () => {
+  if (mode === 'edit') { renderUrl(previewFor(cmd.value)); return; }
+  if (mode === 'inside') { mode = 'search'; insideOf = null; }
+  activeId = null;                     // typing always re-picks the best match
+  renderAll();
+});
+
+cmd.addEventListener('keydown', e => {
+  if (e.isComposing) return;
+  const meta = e.metaKey || e.ctrlKey;
+  const atEnd = cmd.selectionStart === cmd.value.length && cmd.selectionEnd === cmd.value.length;
+  const atStart = cmd.selectionStart === 0 && cmd.selectionEnd === 0;
+  const hasSel = cmd.selectionStart !== cmd.selectionEnd;
+
+  if (mode === 'edit') {
+    if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
+    else if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+    else if (e.key === 'Tab') { e.preventDefault(); commitEdit(); }
+    return;
+  }
+
+  if (mode === 'inside') {
+    const { layers, part } = insideOf;
+    if (e.key === 'ArrowDown' || (meta && e.key === 'n')) { e.preventDefault(); insideOf.idx = Math.min(layers.length - 1, insideOf.idx + 1); renderInside(); }
+    else if (e.key === 'ArrowUp' || (meta && e.key === 'p')) { e.preventDefault(); insideOf.idx = Math.max(0, insideOf.idx - 1); renderInside(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'Escape') { e.preventDefault(); closeInside(); }
+    else if (meta && e.key === 'c' && !hasSel) { e.preventDefault(); copy(layers[insideOf.idx].text); }
+    else if (e.key === 'Enter' && meta && layers[insideOf.idx].isUrl) {
+      e.preventDefault();
+      const inner = layers[insideOf.idx].text;
+      if (commit(inner, `went into ${partName(part)}`)) { closeInside(); flash('The nested URL is now the draft.'); }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const l = layers[insideOf.idx];
+      if (l.kind === 'raw' || l.kind === 'percent') startEdit(part, 'main');
+      else flash(`Editing the ${l.kind} layer is not wired up: copy it, or edit the raw value.`, true);
+    } else if (e.key.length === 1 && !meta) {
+      mode = 'search'; insideOf = null;     // typing falls through to search
+      renderAll();
+    }
+    return;
+  }
+
+  // search
+  if (e.key === 'ArrowDown' || (meta && e.key === 'n')) { e.preventDefault(); move(1); }
+  else if (e.key === 'ArrowUp' || (meta && e.key === 'p')) { e.preventDefault(); move(-1); }
+  else if (e.key === 'Enter') { e.preventDefault(); runResult(active(), { name: e.shiftKey }); }
+  else if (e.key === 'ArrowRight' && atEnd) {
+    const p = activePart();
+    if (p) { e.preventDefault(); openInside(p); }
+  } else if (e.key === 'Escape') {
+    const { prefix, q } = parseInput(cmd.value);
+    if (q) { e.preventDefault(); cmd.value = prefix ? prefix + ' ' : ''; activeId = null; renderAll(); }
+    else if (prefix) { e.preventDefault(); cmd.value = ''; activeId = null; renderAll(); }
+    // Empty and unscoped: let the popup close.
+  } else if (meta && e.key === 'Backspace') {
+    const p = activePart();
+    if (p) { e.preventDefault(); deletePart(p); }
+  } else if (e.key === 'Delete' && atEnd) {
+    const p = activePart();
+    if (p) { e.preventDefault(); deletePart(p); }
+  } else if (meta && (e.key === 'c' || e.key === 'C') && !hasSel) {
+    const p = activePart();
+    if (p) { e.preventDefault(); copyPart(p, e.shiftKey); }
+  } else if (meta && e.key === 'z' && !e.shiftKey) {
+    e.preventDefault(); undo();
+  }
+});
+
+// --- mouse ------------------------------------------------------------------------------
+
+$('results').addEventListener('click', e => {
+  const act = e.target.closest('[data-act]');
+  const row = e.target.closest('.res[data-id]');
+  if (!row) return;
+  const r = results.find(x => x.id === row.dataset.id);
+  if (!r) return;
+  activeId = r.id;
+  if (!act) { renderAll(); cmd.focus(); return; }
+  const a = act.dataset.act;
+  if (a === 'run' || a === 'edit') runResult(r);
+  else if (a === 'name') runResult(r, { name: true });
+  else if (a === 'copy') copyPart(r.part, false);
+  else if (a === 'del') deletePart(r.part);
+  else if (a === 'inside') openInside(r.part);
+  cmd.focus();
+});
+$('results').addEventListener('dblclick', e => {
+  const row = e.target.closest('.res[data-id]');
+  if (!row) return;
+  runResult(results.find(x => x.id === row.dataset.id));
+});
+
+$('url').addEventListener('click', e => {
+  const el = e.target.closest('.tk[data-part]');
+  if (!el || mode === 'edit') return;
+  if (mode === 'inside') { mode = 'search'; insideOf = null; }
+  const { prefix } = parseInput(cmd.value);
+  const p = parts.find(x => x.id === el.dataset.part);
+  cmd.value = prefix && prefix !== '>' && SCOPE_GROUP[prefix] === p.group ? prefix + ' ' : '';
+  activeId = p.id;
+  renderAll();
+  cmd.focus();
+});
+$('url').addEventListener('dblclick', e => {
+  const el = e.target.closest('.tk[data-part]');
+  if (!el) return;
+  const p = parts.find(x => x.id === el.dataset.part);
+  if (p) startEdit(p, 'main');
+});
+
+$('sections').addEventListener('click', e => {
+  const b = e.target.closest('button[data-scope]');
+  if (!b) return;
+  const { prefix } = parseInput(cmd.value);
+  setInput(prefix === b.dataset.scope ? '' : b.dataset.scope + ' ');
+});
+$('sections').addEventListener('mouseover', e => {
+  const b = e.target.closest('button[data-scope]');
+  for (const g of $('url').querySelectorAll('.grp')) g.classList.toggle('hi', !!b && g.dataset.group === SCOPE_GROUP[b.dataset.scope]);
+});
+$('sections').addEventListener('mouseleave', () => {
+  for (const g of $('url').querySelectorAll('.grp')) g.classList.remove('hi');
+});
+
+$('inside').addEventListener('click', e => {
+  const l = e.target.closest('.layer[data-layer]');
+  if (!l) return;
+  insideOf.idx = +l.dataset.layer;
+  renderInside();
+  cmd.focus();
+});
+
+$('recent').addEventListener('click', e => {
+  const b = e.target.closest('button[data-n]');
+  if (!b) return;
+  undo(+b.dataset.n);
+  cmd.focus();
+});
+
+// --- chrome ------------------------------------------------------------------------------
+
+function copy(s) {
+  navigator.clipboard.writeText(s).then(
+    () => flash('Copied: ' + short(s)),
+    () => flash('Clipboard blocked in this frame.', true));
+}
+
+let toastTimer = null;
+function flash(msg, bad) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.toggle('err', !!bad);
+  el.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 2200);
+}
+
+function apply() {
+  baseText = text;
+  baseTok = tokenize(baseText);
+  history = [];
+  setText(text);
+  renderAll();
+  flash('Applied - the tab would navigate here.');
+}
+
+function revert() {
+  if (text === baseText) return;
+  commit(baseText, 'reverted');
+  renderAll();
+  flash('Reverted to the URL the tab is on.');
+}
+
+$('apply-btn').onclick = () => { apply(); cmd.focus(); };
+$('new-btn').onclick = () => { flash('Would open a new tab at the edited URL.'); cmd.focus(); };
+$('revert-btn').onclick = () => { revert(); cmd.focus(); };
+
+for (const btn of document.querySelectorAll('[data-sample]')) {
+  btn.onclick = () => {
+    for (const b of document.querySelectorAll('[data-sample]')) b.setAttribute('aria-pressed', 'false');
+    btn.setAttribute('aria-pressed', 'true');
+    history = [];
+    mode = 'search'; editing = null; insideOf = null; activeId = null;
+    cmd.value = '';
+    load(SAMPLES[btn.dataset.sample]);
+    renderAll();
+    cmd.focus();
+  };
+}
+
+// Focus is the whole point: the popup opens and the captain types.
+load(SAMPLES.typical);
+renderAll();
+cmd.focus();
+
+// Exposed for the test harness only.
+window.__proto = { get text() { return text; }, get baseText() { return baseText; }, get results() { return results; }, get mode() { return mode; }, get activeId() { return activeId; } };
+</script>
+</body>
+</html>

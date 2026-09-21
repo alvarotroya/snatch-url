@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Snatch URL · C · Split</title>
+<link rel="stylesheet" href="proto.css">
+<style>
+/* --- C: one raw line and one list of parts, wired both ways ---------- */
+
+#raw-wrap {
+  position: relative;
+  margin: 9px 10px 6px;
+  border: 1px solid var(--surface0);
+  border-radius: 6px;
+  background: var(--crust);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+#raw-wrap.focused { border-color: var(--mauve); }
+
+/* The backdrop paints the colours and the highlight bands; the textarea on
+   top of it owns the caret and the selection, so selecting characters is
+   exactly as native as in the address bar. */
+#backdrop, #raw {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  padding: 8px 9px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  border: 0;
+  margin: 0;
+  letter-spacing: 0;
+  tab-size: 4;
+}
+
+#backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--text);
+}
+
+#raw {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 104px;
+  max-height: 148px;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--mauve);
+  outline: none;
+  overflow-y: auto;
+}
+#raw::selection { background: rgba(203, 166, 247, 0.34); }
+
+#backdrop mark {
+  background: rgba(249, 226, 175, 0.20);
+  color: inherit;
+  border-radius: 2px;
+  box-shadow: inset 0 -2px 0 var(--staged);
+}
+#backdrop mark.aim {
+  background: rgba(137, 220, 235, 0.22);
+  box-shadow: inset 0 -2px 0 var(--teal);
+}
+
+/* --- the strip that says what the selection is --- */
+#selbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 7px;
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+  min-height: 24px;
+}
+#selbar .what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#selbar .what b { color: var(--text); font-family: var(--mono); }
+#selbar.none .what { color: var(--surface2); }
+
+/* --- the parts list --- */
+#parts {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--surface0);
+}
+
+.part {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-bottom: 1px solid #262637;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+.part:hover { background: #242436; }
+.part.touched { background: #2a2a3f; box-shadow: inset 2px 0 0 var(--teal); }
+.part.changed { box-shadow: inset 2px 0 0 var(--staged); }
+.part.touched.changed { box-shadow: inset 2px 0 0 var(--staged), inset 4px 0 0 var(--teal); }
+
+.part .tag {
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--surface2);
+  width: 58px;
+  flex-shrink: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.part .txt {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.part .eqs { color: var(--surface2); font-family: var(--mono); flex-shrink: 0; }
+.part .eqs.flag {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--surface2);
+}
+.part .txt { cursor: text; }
+.part .txt:hover { background: #33334a; border-radius: 3px; }
+.part .txt.r-val, .part .txt.r-seg, .part .txt.r-host, .part .txt.r-hash { flex: 1 1 auto; }
+.part .txt.r-key { min-width: 4ch; max-width: 45%; }
+.part .icons { display: flex; gap: 2px; flex-shrink: 0; opacity: 0; }
+.part:hover .icons, .part.touched .icons { opacity: 1; }
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 3px;
+  line-height: 1;
+}
+.icon-btn:hover { background: var(--surface0); color: var(--text); }
+.icon-btn.danger:hover { color: var(--red); }
+
+.part input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--crust);
+  border: 1px solid var(--mauve);
+  border-radius: 3px;
+  color: var(--text);
+  padding: 2px 5px;
+  outline: none;
+}
+
+.part-open {
+  padding: 7px 10px 9px 68px;
+  background: var(--mantle);
+  border-bottom: 1px solid #262637;
+}
+.part-open .layer-label {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--surface2);
+  margin: 6px 0 2px;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.part-open pre {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  background: var(--crust);
+  border-radius: 4px;
+  padding: 5px 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 88px;
+  overflow: auto;
+}
+.part-open .row-actions { display: flex; gap: 5px; margin-top: 7px; }
+
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--mantle);
+  border-bottom: 1px solid var(--surface0);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  cursor: pointer;
+}
+.group-head .name {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  color: var(--mauve);
+  text-transform: uppercase;
+}
+.group-head .n { font-size: 10px; color: var(--surface2); flex: 1; }
+.group-head:hover .name { color: var(--lavender); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="demo-bar">
+    <span class="demo-tag">demo url</span>
+    <button data-sample="short">short</button>
+    <button data-sample="typical" aria-pressed="true">typical</button>
+    <button data-sample="monster">monster</button>
+    <span class="spacer"></span>
+    <span>440 × 600</span>
+  </div>
+
+  <header>
+    <h1>Snatch URL</h1>
+    <span class="variant">C · Split</span>
+  </header>
+
+  <div id="raw-wrap">
+    <div id="backdrop" aria-hidden="true"></div>
+    <textarea id="raw" spellcheck="false" aria-label="The raw URL - select and edit any characters"></textarea>
+  </div>
+
+  <div id="selbar" class="none">
+    <span class="what" id="selwhat">Nothing selected</span>
+    <button class="btn" id="sel-copy" disabled>Copy</button>
+    <button class="btn" id="sel-part" disabled>Whole part</button>
+  </div>
+
+  <div id="parts"></div>
+
+  <div class="keys">
+    <span><kbd>drag</kbd> in the line: any characters</span>
+    <span><kbd>click a row</kbd> selects that part above</span>
+    <span><kbd>dbl-click a row</kbd> type over it</span>
+  </div>
+
+  <div class="status-bar" id="status-bar">
+    <span class="change-summary" id="change-summary" role="status">No unapplied changes</span>
+    <button class="btn" id="revert-btn" disabled>Revert</button>
+    <button class="btn" id="new-btn" disabled>New tab</button>
+    <button class="btn btn-primary" id="apply-btn" disabled>Apply</button>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+</div>
+
+<script type="module">
+import {
+  SAMPLES, tokenize, tokensIn, groupRange, peel, badgeFor,
+  encodeFor, spliceRaw, ROLE_LABEL, isPunct, countChanges,
+} from './proto-core.js?v=2';
+
+const $ = id => document.getElementById(id);
+const raw = $('raw');
+
+let baseText = SAMPLES.typical;
+let text = baseText;
+let tok = tokenize(text);
+let baseTok = tokenize(baseText);
+let openId = null;    // the part whose inspector is unfolded
+let aim = null;       // the range being pointed at from the list
+
+// --- render ------------------------------------------------------------
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+
+function changedSet() {
+  if (!tok.ok || !baseTok.ok) return new Set();
+  const base = new Map(baseTok.tokens.filter(t => t.editable).map(t => [t.id, t.raw]));
+  const out = new Set();
+  for (const t of tok.tokens) {
+    if (t.editable && (!base.has(t.id) || base.get(t.id) !== t.raw)) out.add(t.id);
+  }
+  return out;
+}
+
+/**
+ * The backdrop is the same string as the textarea, character for character,
+ * so the colours and the highlight land exactly under the real caret. Any
+ * divergence here would show up as text that does not line up, which is why
+ * it is built from the same offsets rather than from a second parse.
+ */
+function renderBackdrop() {
+  const changed = changedSet();
+  const marks = [];
+  if (aim) marks.push({ ...aim, cls: 'aim' });
+  if (tok.ok) {
+    for (const t of tok.tokens) if (changed.has(t.id)) marks.push({ start: t.start, end: t.end, cls: '' });
+  }
+  marks.sort((a, b) => a.start - b.start);
+
+  let html = '';
+  let pos = 0;
+  const colourise = (from, to) => {
+    if (!tok.ok) return escapeHtml(text.slice(from, to));
+    let out = '';
+    for (const t of tok.tokens) {
+      const s = Math.max(from, t.start), e = Math.min(to, t.end);
+      if (s < e) out += `<span class="r-${t.role}">${escapeHtml(text.slice(s, e))}</span>`;
+    }
+    return out;
+  };
+  for (const m of marks) {
+    if (m.start < pos) continue;
+    html += colourise(pos, m.start);
+    html += `<mark class="${m.cls}">${colourise(m.start, m.end)}</mark>`;
+    pos = m.end;
+  }
+  html += colourise(pos, text.length);
+  $('backdrop').innerHTML = html + '<br>';
+  $('backdrop').scrollTop = raw.scrollTop;
+}
+
+function rowShell(id, start, end, changed, tag, body, hasLayers) {
+  return `
+    <div class="part ${changed ? 'changed' : ''}" data-id="${id}"
+         data-start="${start}" data-end="${end}" tabindex="0">
+      <span class="tag">${tag}</span>
+      ${body}
+      <span class="icons">
+        ${hasLayers ? '<button class="icon-btn" data-act="open" aria-label="Look inside">&#8964;</button>' : ''}
+        <button class="icon-btn" data-act="copy" aria-label="Copy this part">&#9096;</button>
+        <button class="icon-btn danger" data-act="del" aria-label="Delete this part">&#10005;</button>
+      </span>
+    </div>`;
+}
+
+function chip(t) {
+  const shown = t.role === 'val' || t.role === 'seg' || t.role === 'hash'
+    ? peel(t.raw).at(-1).text : t.text;
+  const badge = badgeFor(t.raw);
+  return `<span class="txt r-${t.role}" data-id="${t.id}" data-start="${t.start}" data-end="${t.end}"
+    >${escapeHtml(shown)}</span>${badge ? `<span class="badge ${badge}">${badge === 'encoded' ? '%' : badge}</span>` : ''}`;
+}
+
+/** One row per simple part. */
+function partRow(t, changed) {
+  const tag = t.role === 'seg' ? `path ${t.index + 1}` : ROLE_LABEL[t.role];
+  return rowShell(t.id, t.start, t.end, changed.has(t.id), tag, chip(t), peel(t.raw).length > 1)
+    + (openId === t.id ? inspectorHtml(t) : '');
+}
+
+/**
+ * One row per PARAMETER, not per token: a name and a value on the same line,
+ * each selecting its own characters. Thirteen tokens would otherwise become
+ * thirteen rows, which is the very list this design is trying to shorten.
+ */
+function paramRow(key, val, changed) {
+  const id = `p-${key.index}`;
+  const start = key.start;
+  const end = (val || key).end;
+  const body = chip(key)
+    + (val ? '<span class="eqs">=</span>' + chip(val) : '<span class="eqs flag">flag</span>');
+  const open = val && peel(val.raw).length > 1;
+  return rowShell(id, start, end, changed.has(key.id) || (val && changed.has(val.id)), `param ${key.index + 1}`, body, open)
+    + (val && openId === val.id ? inspectorHtml(val) : '');
+}
+
+function inspectorHtml(t) {
+  const layers = peel(t.raw);
+  return `<div class="part-open">
+    ${layers.map((l, i) => `
+      <div class="layer-label">${l.label}${l.isUrl ? ' <span class="badge url">nested url</span>' : ''}</div>
+      <pre class="${i === layers.length - 1 ? 'last' : ''}">${escapeHtml(l.text)}</pre>`).join('')}
+    <div class="row-actions">
+      <button class="btn" data-act="copy-plain" data-id="${t.id}">Copy decoded</button>
+      <button class="btn" data-act="edit" data-id="${t.id}">Edit decoded</button>
+    </div>
+  </div>`;
+}
+
+function render() {
+  renderBackdrop();
+
+  const box = $('parts');
+  if (!tok.ok) {
+    box.innerHTML = '<div class="part-open">That is not a URL yet. Keep typing - '
+      + 'the parts come back as soon as it parses.</div>';
+    renderChrome();
+    return;
+  }
+
+  const changed = changedSet();
+  const params = [];
+  for (const t of tok.tokens) {
+    if (t.role === 'key') params.push({ key: t, val: null });
+    if (t.role === 'val' && params.length) params[params.length - 1].val = t;
+  }
+
+  const groups = [
+    ['origin', 'host', tok.tokens.filter(t => t.group === 'origin' && t.editable)
+      .map(t => partRow(t, changed))],
+    ['path', 'path', tok.tokens.filter(t => t.group === 'path' && t.editable)
+      .map(t => partRow(t, changed))],
+    ['query', 'query', params.map(p => paramRow(p.key, p.val, changed))],
+    ['hash', 'fragment', tok.tokens.filter(t => t.group === 'hash' && t.editable)
+      .map(t => partRow(t, changed))],
+  ];
+
+  box.innerHTML = groups.filter(([, , rows]) => rows.length).map(([key, name, rows]) => `
+    <div class="group-head" data-group="${key}">
+      <span class="name">${name}</span>
+      <span class="n">${rows.length} ${name === 'query' ? 'param' : 'part'}${rows.length === 1 ? '' : 's'} · click to select the lot</span>
+    </div>
+    ${rows.join('')}`).join('');
+
+  markTouched();
+  renderChrome();
+}
+
+function renderChrome() {
+  const dirty = text !== baseText;
+  const n = tok.ok && baseTok.ok ? countChanges(baseText, text, baseTok.tokens, tok.tokens) : 1;
+  $('change-summary').textContent = dirty
+    ? `${n} unapplied change${n === 1 ? '' : 's'}`
+    : 'No unapplied changes';
+  $('status-bar').classList.toggle('dirty', dirty);
+  for (const id of ['apply-btn', 'new-btn', 'revert-btn']) $(id).disabled = !dirty;
+}
+
+// --- selection: the line tells the list -------------------------------
+
+function markTouched() {
+  const from = raw.selectionStart, to = raw.selectionEnd;
+  const hit = tok.ok ? new Set(tokensIn(tok.tokens, from, to).map(t => t.id)) : new Set();
+  for (const el of $('parts').querySelectorAll('.part')) {
+    const ids = [el.dataset.id, ...[...el.querySelectorAll('.txt[data-id]')].map(x => x.dataset.id)];
+    el.classList.toggle('touched', ids.some(id => hit.has(id)));
+  }
+
+  const chars = to - from;
+  const parts = tok.ok ? tokensIn(tok.tokens, from, to).filter(t => !isPunct(t.role)) : [];
+  const bar = $('selbar');
+  bar.classList.toggle('none', chars === 0 && parts.length === 0);
+  $('sel-copy').disabled = chars === 0;
+  $('sel-part').disabled = parts.length === 0;
+
+  $('selwhat').innerHTML = chars === 0
+    ? (parts.length
+      ? `caret in <b>${escapeHtml(ROLE_LABEL[parts[0].role])}</b>`
+      : 'Nothing selected')
+    : parts.length === 1
+      ? `<b>${chars}</b> chars · inside <b>${escapeHtml(ROLE_LABEL[parts[0].role])}</b>`
+      : `<b>${chars}</b> chars · across <b>${parts.length} parts</b>`;
+}
+
+for (const ev of ['select', 'keyup', 'click', 'focus', 'input']) {
+  raw.addEventListener(ev, () => { aim = null; renderBackdrop(); markTouched(); });
+}
+document.addEventListener('selectionchange', () => {
+  if (document.activeElement === raw) markTouched();
+});
+raw.addEventListener('scroll', () => { $('backdrop').scrollTop = raw.scrollTop; });
+raw.addEventListener('focus', () => $('raw-wrap').classList.add('focused'));
+raw.addEventListener('blur', () => $('raw-wrap').classList.remove('focused'));
+
+// --- typing in the raw line -------------------------------------------
+
+raw.addEventListener('input', () => {
+  text = raw.value;
+  tok = tokenize(text);
+  render();
+  autoSize();
+});
+
+// --- the list tells the line ------------------------------------------
+
+function selectRange(start, end) {
+  raw.focus();
+  raw.setSelectionRange(start, end);
+  aim = null;
+  renderBackdrop();
+  markTouched();
+}
+
+$('parts').addEventListener('mouseover', e => {
+  const row = e.target.closest('.part');
+  if (!row) return;
+  aim = { start: +row.dataset.start, end: +row.dataset.end };
+  renderBackdrop();
+});
+$('parts').addEventListener('mouseleave', () => { aim = null; renderBackdrop(); });
+
+$('parts').addEventListener('click', e => {
+  const head = e.target.closest('.group-head');
+  if (head) {
+    const r = groupRange(tok.tokens, head.dataset.group);
+    if (r) selectRange(r.start, r.end);
+    return;
+  }
+
+  const btn = e.target.closest('button[data-act]');
+  const row = e.target.closest('.part');
+  const id = (btn && btn.dataset.id) || (row && row.dataset.id);
+  // A param row is identified by the pair; its actions work on the value when
+  // there is one, and on the name for a bare flag.
+  const t = !tok.ok ? null
+    : tok.tokens.find(x => x.id === id)
+      || tok.tokens.find(x => x.start === (row ? +row.dataset.start : -1) && x.role === 'key')
+      || null;
+  const pairVal = t && t.role === 'key'
+    ? tok.tokens.find(x => x.role === 'val' && x.index === t.index) : null;
+
+  if (btn && t) {
+    const act = btn.dataset.act;
+    const target = pairVal || t;
+    if (act === 'copy') copy(target.raw);
+    else if (act === 'copy-plain') copy(peel(target.raw).at(-1).text);
+    else if (act === 'del') deletePart(t);
+    else if (act === 'open') { openId = openId === target.id ? null : target.id; render(); }
+    else if (act === 'edit') editRow(t, true);
+    return;
+  }
+  const sub = e.target.closest('.txt[data-start]');
+  if (sub) { selectRange(+sub.dataset.start, +sub.dataset.end); return; }
+  if (row) selectRange(+row.dataset.start, +row.dataset.end);
+});
+
+$('parts').addEventListener('dblclick', e => {
+  const row = e.target.closest('.part');
+  if (!row || !tok.ok) return;
+  const sub = e.target.closest('.txt[data-id]');
+  const t = tok.tokens.find(x => x.id === (sub ? sub.dataset.id : row.dataset.id));
+  if (t) editRow(t, false);
+});
+
+$('parts').addEventListener('keydown', e => {
+  const row = e.target.closest('.part');
+  if (!row || !tok.ok) return;
+  const t = tok.tokens.find(x => x.id === row.dataset.id)
+    || tok.tokens.find(x => x.start === +row.dataset.start);
+  if (!t) return;
+  if (e.key === 'Enter') { e.preventDefault(); editRow(t, false); }
+  if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); deletePart(t); }
+});
+
+/** Type over one part, from the list side. The line updates as it commits. */
+function editRow(t, decoded) {
+  // A parameter row holds two chips, so the field is found by the chip's own
+  // id rather than by the row's - the row is the pair, not the part.
+  const txt = $('parts').querySelector(`.txt[data-id="${t.id}"]`);
+  if (!txt) return;
+  const input = document.createElement('input');
+  input.value = decoded ? peel(t.raw).at(-1).text : (t.role === 'val' || t.role === 'seg' ? peel(t.raw).at(-1).text : t.text);
+  input.setAttribute('aria-label', 'Type over this part');
+  txt.replaceWith(input);
+  input.focus();
+  input.select();
+
+  // Enter commits and re-renders, which removes the input and fires blur, so
+  // the second commit would splice the already-edited text again.
+  let committed = false;
+  const commit = ok => {
+    if (committed) return;
+    committed = true;
+    if (!ok) { render(); return; }
+    const encoded = encodeFor(t.role, input.value);
+    text = spliceRaw(text, t.start, t.end, encoded);
+    raw.value = text;
+    tok = tokenize(text);
+    render();
+    selectRange(t.start, t.start + encoded.length);
+  };
+  input.addEventListener('blur', () => commit(true));
+  input.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); commit(true); }
+    if (e.key === 'Escape') { e.preventDefault(); commit(false); }
+  });
+}
+
+function deletePart(t) {
+  let from = t.start, to = t.end;
+  const all = tok.tokens;
+  const i = all.indexOf(t);
+  if (t.role === 'seg' && all[i - 1] && all[i - 1].role === 'sep') from = all[i - 1].start;
+  if (t.role === 'key' || t.role === 'val') {
+    const pair = all.filter(x => ['key', 'eq', 'val'].includes(x.role) && x.index === t.index);
+    from = pair[0].start;
+    to = pair.at(-1).end;
+    const before = all[all.indexOf(pair[0]) - 1];
+    const after = all[all.indexOf(pair.at(-1)) + 1];
+    if (before && before.role === 'amp') from = before.start;
+    else if (after && after.role === 'amp') to = after.end;
+    else if (before && before.role === 'qmark') from = before.start;
+  }
+  text = spliceRaw(text, from, to, '');
+  raw.value = text;
+  tok = tokenize(text);
+  openId = null;
+  render();
+}
+
+// --- selection bar actions --------------------------------------------
+
+$('sel-copy').onclick = () => copy(raw.value.slice(raw.selectionStart, raw.selectionEnd));
+$('sel-part').onclick = () => {
+  const parts = tokensIn(tok.tokens, raw.selectionStart, raw.selectionEnd).filter(t => !isPunct(t.role));
+  if (!parts.length) return;
+  selectRange(parts[0].start, parts.at(-1).end);
+};
+
+// --- chrome ------------------------------------------------------------
+
+// navigator.clipboard is unavailable in an opaque origin, which is what an
+// embedded review frame is, so fall back to the old selection trick before
+// telling the user it failed.
+function copy(s) {
+  const done = () => flash('Copied: ' + (s.length > 38 ? s.slice(0, 38) + '…' : s));
+  const legacy = () => {
+    const ta = document.createElement('textarea');
+    ta.value = s;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+    document.body.append(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    ta.remove();
+    ok ? done() : flash('Clipboard blocked here - open this prototype in its own tab.', true);
+  };
+  if (!navigator.clipboard) { legacy(); return; }
+  navigator.clipboard.writeText(s).then(done, legacy);
+}
+
+let toastTimer = null;
+function flash(msg, bad) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.toggle('err', !!bad);
+  el.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 2200);
+}
+
+$('apply-btn').onclick = () => {
+  baseText = text;
+  baseTok = tokenize(baseText);
+  render();
+  flash('Applied - the tab would navigate here.');
+};
+$('new-btn').onclick = () => flash('Would open a new tab at the edited URL.');
+$('revert-btn').onclick = () => { setUrl(baseText); flash('Reverted.'); };
+
+function autoSize() {
+  raw.style.height = 'auto';
+  raw.style.height = Math.min(148, Math.max(52, raw.scrollHeight)) + 'px';
+  $('backdrop').scrollTop = raw.scrollTop;
+}
+
+function setUrl(url) {
+  text = url;
+  raw.value = url;
+  tok = tokenize(text);
+  openId = null;
+  aim = null;
+  render();
+  autoSize();
+  raw.setSelectionRange(0, 0);
+  markTouched();
+}
+
+for (const btn of document.querySelectorAll('[data-sample]')) {
+  btn.onclick = () => {
+    for (const b of document.querySelectorAll('[data-sample]')) b.setAttribute('aria-pressed', 'false');
+    btn.setAttribute('aria-pressed', 'true');
+    baseText = SAMPLES[btn.dataset.sample];
+    baseTok = tokenize(baseText);
+    setUrl(baseText);
+  };
+}
+
+setUrl(text);
+</script>
+</body>
+</html>
