@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snatch URL · touching the URL · eight prototypes</title>
+<style>
+:root {
+  /* Catppuccin Mocha - the design system Snatch URL already uses
+     (styles.css:3-18). The document is dark because the product is. */
+  --base: #1e1e2e;
+  --mantle: #181825;
+  --crust: #11111b;
+  --surface0: #313244;
+  --surface1: #45475a;
+  --surface2: #585b70;
+  --text: #cdd6f4;
+  --muted: #a6adc8;
+  --mauve: #cba6f7;
+  --blue: #89b4fa;
+  --green: #a6e3a1;
+  --peach: #fab387;
+  --yellow: #f9e2af;
+  --red: #f38ba8;
+  --teal: #94e2d5;
+  --lavender: #b4befe;
+  --pink: #f5c2e7;
+  --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--base);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1160px; margin: 0 auto; padding: 0 24px 96px; }
+
+/* --- type --- */
+h1, h2, h3, h4 { line-height: 1.22; margin: 0; font-weight: 650; }
+h1 { font-size: clamp(30px, 4.6vw, 46px); letter-spacing: -0.02em; }
+h2 { font-size: clamp(22px, 3vw, 29px); letter-spacing: -0.015em; }
+h3 { font-size: 18px; }
+h4 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; }
+p { margin: 0 0 14px; }
+a { color: var(--lavender); }
+strong { color: #fff; font-weight: 620; }
+code, .mono { font-family: var(--mono); font-size: 0.88em; }
+code {
+  background: var(--crust);
+  border: 1px solid var(--surface0);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--peach);
+  overflow-wrap: anywhere;
+}
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mauve);
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.lede { font-size: 18px; color: var(--muted); max-width: 66ch; }
+.small { font-size: 13px; color: var(--muted); }
+.tiny { font-size: 11.5px; color: var(--surface2); }
+
+/* --- hero --- */
+header.hero {
+  border-bottom: 1px solid var(--surface0);
+  background:
+    radial-gradient(1200px 380px at 12% -40%, rgba(203,166,247,0.16), transparent 70%),
+    radial-gradient(900px 300px at 88% -30%, rgba(148,226,213,0.10), transparent 70%),
+    var(--mantle);
+  padding: 54px 0 38px;
+  margin-bottom: 42px;
+}
+.quote {
+  border-left: 3px solid var(--mauve);
+  padding: 4px 0 4px 18px;
+  margin: 26px 0 0;
+  font-size: 17px;
+  color: var(--text);
+  max-width: 70ch;
+}
+.quote .who { display: block; margin-top: 8px; font-size: 12px; color: var(--surface2); letter-spacing: 0.06em; text-transform: uppercase; }
+
+/* --- section rhythm --- */
+section { margin: 0 0 64px; scroll-margin-top: 20px; }
+.sec-head { margin-bottom: 20px; }
+.sec-head h2 { margin-bottom: 8px; }
+hr.rule { border: 0; border-top: 1px solid var(--surface0); margin: 0 0 40px; }
+
+/* --- cards & grids --- */
+.card {
+  background: var(--mantle);
+  border: 1px solid var(--surface0);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.grid { display: grid; gap: 18px; }
+.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 860px) { .g2, .g3 { grid-template-columns: minmax(0, 1fr); } }
+
+.pros { list-style: none; padding: 0; margin: 0; }
+.pros li { position: relative; padding-left: 20px; margin-bottom: 7px; font-size: 14px; }
+.pros li::before { position: absolute; left: 0; top: 0; font-weight: 700; }
+.pros.good li::before { content: '+'; color: var(--green); }
+.pros.bad li::before { content: '−'; color: var(--red); }
+.pros.open li::before { content: '?'; color: var(--yellow); }
+
+/* --- tables --- */
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--surface0); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 620px; }
+th, td { text-align: left; padding: 10px 13px; vertical-align: top; border-bottom: 1px solid var(--surface0); }
+th { background: var(--crust); font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); font-weight: 700; position: sticky; top: 0; }
+tr:last-child td { border-bottom: none; }
+td.k { color: var(--muted); font-weight: 600; white-space: nowrap; }
+.yes { color: var(--green); } .no { color: var(--red); } .meh { color: var(--yellow); }
+.tbl-wrap.slim table { min-width: 0; }
+.tbl-wrap.slim td.k { white-space: normal; width: 34%; }
+
+/* --- prototype block --- */
+.proto { border: 1px solid var(--surface0); border-radius: 14px; overflow: hidden; background: var(--mantle); }
+.proto-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--surface0);
+  background: linear-gradient(180deg, rgba(203,166,247,0.08), transparent);
+}
+.proto-head .letter {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--base);
+  background: var(--mauve);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+.proto-head h3 { font-size: 21px; }
+.proto-head .thesis { color: var(--muted); font-size: 14px; flex-basis: 100%; }
+
+.proto-body { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 22px; padding: 20px; align-items: start; }
+@media (max-width: 1000px) { .proto-body { grid-template-columns: minmax(0, 1fr); } }
+
+.stage { display: flex; flex-direction: column; gap: 8px; }
+.frame-shell {
+  border: 1px solid var(--surface1);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--base);
+  box-shadow: 0 18px 44px rgba(0,0,0,0.45);
+  width: max-content;
+  max-width: 100%;
+}
+.frame-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--crust);
+  border-bottom: 1px solid var(--surface0);
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--surface1); }
+.frame-bar .label { font-size: 10.5px; color: var(--surface2); letter-spacing: 0.06em; text-transform: uppercase; margin-left: 4px; }
+.frame-bar .pop {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--lavender);
+  text-decoration: none;
+  border: 1px solid var(--surface1);
+  border-radius: 5px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.frame-bar .pop:hover { background: var(--surface0); color: var(--text); }
+iframe.demo { display: block; border: 0; width: 440px; height: 600px; max-width: 100%; background: var(--base); }
+
+.try { font-size: 12.5px; color: var(--muted); background: var(--crust); border: 1px solid var(--surface0); border-radius: 8px; padding: 10px 12px; }
+.try b { color: var(--text); }
+.try ol { margin: 6px 0 0; padding-left: 18px; }
+.try li { margin-bottom: 4px; }
+
+/* --- controls --- */
+.seg {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--crust);
+  border: 1px solid var(--surface0);
+  border-radius: 999px;
+  padding: 3px;
+}
+.seg button {
+  font: inherit;
+  font-size: 12.5px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 5px 13px;
+  cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--surface0); color: var(--text); }
+
+/* --- questions --- */
+.q { border: 1px solid var(--surface0); border-radius: 12px; background: var(--mantle); padding: 18px 20px; margin-bottom: 16px; }
+.q h3 { margin-bottom: 4px; }
+.q .why { font-size: 13.5px; color: var(--muted); margin-bottom: 14px; }
+.opts { display: grid; gap: 8px; margin-bottom: 14px; }
+.opt {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid var(--surface0);
+  border-radius: 9px;
+  padding: 10px 12px;
+  cursor: pointer;
+  background: var(--base);
+}
+.opt:hover { border-color: var(--surface2); }
+.opt:has(input:checked) { border-color: var(--mauve); background: #2b2640; }
+.opt input { margin-top: 3px; accent-color: var(--mauve); flex-shrink: 0; }
+.opt .t { font-size: 14px; font-weight: 600; }
+.opt .d { font-size: 12.5px; color: var(--muted); }
+.q textarea {
+  width: 100%;
+  min-height: 74px;
+  background: var(--crust);
+  border: 1px solid var(--surface0);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13.5px;
+  padding: 9px 11px;
+  resize: vertical;
+}
+.q textarea:focus, .opt input:focus-visible { outline: 2px solid var(--mauve); outline-offset: 1px; }
+.q .submit, .answers .submit {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  background: var(--mauve);
+  color: var(--base);
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.q .submit:hover, .answers .submit:hover { background: var(--lavender); }
+.q .queued, .answers .queued { font-size: 12.5px; color: var(--green); margin-left: 10px; }
+.answers pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; padding: 12px 14px;
+  background: var(--crust); border: 1px solid var(--surface0); border-radius: 8px;
+  font-family: var(--mono); font-size: 12.5px; color: var(--text); }
+
+/* --- figures --- */
+figure { margin: 0 0 8px; }
+figcaption { font-size: 12.5px; color: var(--surface2); margin-top: 8px; }
+svg { width: 100%; height: auto; display: block; }
+svg text { font-family: var(--sans); }
+svg text.m, svg tspan.m { font-family: var(--mono); }
+svg .mono { font-family: var(--mono); }
+
+/* --- screenshot --- */
+.shot { border: 1px solid var(--surface1); border-radius: 10px; overflow: hidden; width: max-content; max-width: 100%; }
+.shot img { display: block; width: 440px; max-width: 100%; height: auto; }
+
+
+/* --- v2: eight prototypes --- */
+.round {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 18px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--surface0);
+}
+.round .n {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--base);
+  background: var(--surface2);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+.round.now .n { background: var(--green); }
+.round h2 { flex: 1; min-width: 0; }
+.round .said {
+  flex-basis: 100%;
+  font-size: 14px;
+  color: var(--muted);
+  border-left: 3px solid var(--mauve);
+  padding-left: 14px;
+}
+.round .said em { color: var(--text); font-style: normal; }
+
+.proto.star { border-color: var(--green); box-shadow: 0 0 0 1px rgba(166,227,161,0.18); }
+.proto.star .proto-head { background: linear-gradient(180deg, rgba(166,227,161,0.10), transparent); }
+.proto-body.wide { grid-template-columns: minmax(0, 1fr); }
+iframe.demo.wide { width: 900px; height: 640px; }
+
+.mini { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; }
+@media (max-width: 1000px) { .mini { grid-template-columns: minmax(0,1fr); } }
+.mini h4 { margin-bottom: 8px; }
+
+.dim-note {
+  font-size: 12.5px;
+  color: var(--surface2);
+  border: 1px dashed var(--surface1);
+  border-radius: 8px;
+  padding: 9px 12px;
+  margin-top: 14px;
+}
+
+/* --- nav --- */
+nav.toc {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(24,24,37,0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--surface0);
+  margin-bottom: 28px;
+}
+nav.toc .inner { max-width: 1160px; margin: 0 auto; padding: 9px 24px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+nav.toc a { font-size: 12.5px; color: var(--muted); text-decoration: none; white-space: nowrap; }
+nav.toc a:hover { color: var(--text); }
+nav.toc .spacer { flex: 1; }
+.badge {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: var(--surface0);
+  color: var(--muted);
+}
+.badge.rec { background: rgba(166,227,161,0.16); color: var(--green); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Snatch URL · UX prototypes · round 3 · 21 Sep 2026</div>
+    <h1>A second address bar</h1>
+    <p class="lede" style="margin-top:14px">
+      Eight working prototypes now, and they all run for real on this page. Start with <b>E</b> — it is
+      the wide popup you just described. The other seven are the ground it stands on.
+    </p>
+    <blockquote class="quote">
+      “We'll keep a popup but can we experiment with making it wider? like a secondary adress bar below
+      the real one? Just smarter and with more functions?”
+      <span class="who">you, just now — round 3</span>
+    </blockquote>
+    <blockquote class="quote" style="border-color:var(--surface1)">
+      “the URL as an overlay or displayed horizontally with dropdowns for each section, quick actions for
+      each section”
+      <span class="who">round 2 — built as D, F, G, H</span>
+    </blockquote>
+    <blockquote class="quote" style="border-color:var(--surface1)">
+      “a pop up that really allows me feel I'm touching that URL with my hands. Copy parts of it,
+      overwrite parts of it, select certain chars there, select entire portions.”
+      <span class="who">the original brief — built as A, B, C</span>
+    </blockquote>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="inner">
+    <a href="#e">E · Address Bar</a>
+    <a href="#d">D · Rail</a>
+    <a href="#f">F · Hover</a>
+    <a href="#g">G · Actions</a>
+    <a href="#h">H · Command</a>
+    <a href="#round1">A B C</a>
+    <a href="#compare">Compare</a>
+    <a href="#decide">Your call</a>
+    <span class="spacer"></span>
+    <span class="tiny">popup demos</span>
+    <span class="seg" id="size-seg">
+      <button data-w="440" data-h="600" aria-pressed="true">440 × 600</button>
+      <button data-w="800" data-h="600">800 × 600</button>
+    </span>
+  </div>
+</nav>
+
+<div class="wrap">
+
+<section id="fixed">
+  <div class="grid g3">
+    <div class="card" style="border-color:var(--green)">
+      <h4 style="color:var(--green)">Every one of them runs</h4>
+      <p class="small" style="margin:8px 0 0">Each prototype is a single self-contained file — no server,
+        no build, nothing to install — driven by the extension's real <code>url-model.js</code>.
+        <b>open in its own tab ↗</b> on any frame gives you a full-size copy where the clipboard works
+        too.</p>
+    </div>
+    <div class="card">
+      <h4>The dashed strip is scaffolding</h4>
+      <p class="small" style="margin:8px 0 0">It switches the demo URL between <b>short</b>,
+        <b>typical</b> and <b>monster</b> (13 params, base64 JSON, a nested URL). It would not ship.
+        The switch in the top bar of this page resizes every popup-shaped demo between 440 and 800.</p>
+    </div>
+    <div class="card">
+      <h4>Same colours everywhere</h4>
+      <p class="small" style="margin:8px 0 0">
+        <span style="color:var(--mauve)">host</span> ·
+        <span style="color:var(--peach)">path</span> ·
+        <span style="color:var(--blue)">name</span> ·
+        <span style="color:var(--green)">value</span> ·
+        <span style="color:var(--teal)">#fragment</span> ·
+        <span style="color:var(--yellow)">yellow = unapplied</span>.
+        Differences you see are design, not paint. All eight run the extension's real URL model.</p>
+    </div>
+  </div>
+</section>
+
+<div class="round now">
+  <span class="n">round 3</span>
+  <h2>The one you just asked for</h2>
+  <p class="said">You said: <em>keep the popup, make it wider, like a secondary address bar below the
+    real one, smarter and with more functions.</em> A Chrome action popup is capped at
+    <b>800 × 600</b> and is anchored under the toolbar icon — so a wide, shallow one lands exactly
+    where you described. E is 800 wide and about 190 tall with the drawer shut.</p>
+</div>
+
+<section id="e">
+  <div class="proto star">
+    <div class="proto-head">
+      <span class="letter" style="background:var(--green)">E</span>
+      <h3>Second Address Bar</h3>
+      <span class="badge">your newest idea</span>
+      <p class="thesis">A Chrome popup is capped at 800&nbsp;&times;&nbsp;600 and hangs directly under the toolbar icon — which is to say, directly under the real address bar. Make it 800 wide and 190 tall and it stops being a panel and becomes a second address bar.</p>
+    </div>
+    <div class="proto-body wide">
+      <div class="stage">
+        <div class="frame-shell">
+          <div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="label">E · Second Address Bar</span>
+            <a class="pop" href="prototypes/p5-addressbar.html" target="_blank" rel="noopener">open in its own tab ↗</a></div>
+          <iframe class="demo wide" src="prototypes/p5-addressbar.html" title="Prototype E, Second Address Bar" loading="lazy"></iframe>
+        </div>
+        <div class="try">
+          <b>Try this</b>
+          <ol>
+            <li>The whole URL fits in three lines. Click <code>price_desc</code> right in the bar and type over it.</li>
+            <li>Click the <b>QUERY 7 params ▾</b> cell — a shallow drawer opens under the bar, not a panel over it.</li>
+            <li>Switch the demo URL to <b>monster</b> and press <b>⚡ Clean</b> — three <code>utm_*</code> parameters gone, staged, revertible.</li>
+            <li>Press <b>decoded</b> in the title bar: the bar shows what the URL <em>says</em>; edits still write proper encoding.</li>
+            <li>Press <b>one line</b> for the purest address-bar shape — it scrolls sideways like the real one.</li>
+            <li>Open the <code>ref</code> row with <span class="mono">⌄</span> to see the nested URL peeled.</li>
+          </ol>
+        </div>
+      </div>
+      <div>
+        <h4>What it makes easy</h4>
+        <ul class="pros good">
+          <li><b>It is the shape you asked for.</b> Closed it is ~190px tall and reads as a second address bar; the mock browser above it is there so you can see that.</li>
+          <li><b>The whole URL is visible</b> at 800px — three lines for the demo URL, where the 440px popup needed six and still cut it off.</li>
+          <li><b>Sections are cells with carets</b>, exactly your "dropdowns for each section": host, path, query, fragment, each showing a count, each one click from its rows.</li>
+          <li><b>Two levels of action.</b> Section-level in the drawer header (copy section raw, copy decoded, clear); part-level per row (peel, copy, delete) and in the bar itself (click to type over).</li>
+          <li><b>"More functions" is where the width pays.</b> ⚡ Clean strips tracking params, <b>decoded</b> flips the whole bar to plain text, <b>+ param</b> adds one, and the whole URL copies from a single button.</li>
+          <li><b>Staged, not live.</b> Same Apply / New tab / Revert as the others; nothing navigates until you say so.</li>
+        </ul>
+        <h4 style="margin-top:18px">What it makes hard</h4>
+        <ul class="pros bad">
+          <li><b>800px is wide.</b> On a 1280px laptop the popup covers most of the window. It is a popup, so it also dies the moment you click the page behind it — the thing it most resembles is the one thing it cannot be.</li>
+          <li><b>Still no character selection.</b> The bar is a row of spans, not a text field, so you cannot drag a selection from the middle of one part into the next. That is A&nbsp;·&nbsp;Live Line's trick, and it is not in here.</li>
+          <li><b>Tiny targets.</b> <code>tag=a</code> gives you a one-character click target. The drawer rescues it, but the bar alone is fiddly for short parts.</li>
+          <li><b>The drawer repeats the bar.</b> Same parts, twice, in two places — the same complaint C&nbsp;·&nbsp;Split earns, in a milder form.</li>
+          <li><b>The mock browser is a demo device.</b> A real popup cannot dim the page or draw the address bar above itself; it will look slightly less integrated than this does.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<div class="round">
+  <span class="n">round 2</span>
+  <h2>Horizontal, with dropdowns and quick actions</h2>
+  <p class="said">Four readings of <em>“displayed horizontally with dropdowns for each section, quick
+    actions for each section”</em>, each answering a different question: does the action belong in a
+    menu (D), under your pointer (F), in one fixed place (G), or behind what you type (H)?
+    Built by Fable agents, then fixed and verified here.</p>
+</div>
+
+<section id="d">
+  <div class="proto ">
+    <div class="proto-head">
+      <span class="letter" style="background:var(--peach)">D</span>
+      <h3>Rail</h3>
+      <span class="badge">the literal reading</span>
+      <p class="thesis">The URL as one horizontal rail of sections, each a cell with a caret; clicking one drops a panel of its parts with quick actions.</p>
+    </div>
+    <div class="proto-body">
+      <div class="stage">
+        <div class="frame-shell">
+          <div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="label">D · Rail</span>
+            <a class="pop" href="prototypes/p4-rail.html" target="_blank" rel="noopener">open in its own tab ↗</a></div>
+          <iframe class="demo popup-demo" src="prototypes/p4-rail.html" title="Prototype D, Rail" loading="lazy"></iframe>
+        </div>
+        <div class="try">
+          <b>Try this</b>
+          <ol>
+            <li>Click <b>? 7 params ▾</b> — every parameter, numbered, with copy / edit / delete on each row.</li>
+            <li>Press <b>Copy</b> in the panel header for the whole query as URL text; <b>All</b> selects every row.</li>
+            <li>Edit a row: the text comes up already selected, so typing replaces it.</li>
+            <li>Flip the page-level size switch to <b>800 wide</b> — the rail stops scrolling and all four sections sit on one line.</li>
+          </ol>
+        </div>
+      </div>
+      <div>
+        <h4>What it makes easy</h4>
+        <ul class="pros good">
+          <li><b>Immediately legible.</b> Four cells, four counts; you know what the URL contains before you touch anything.</li>
+          <li><b>The panel is roomy</b> — numbered rows, full values, badges, and per-row actions that do not hide behind a hover.</li>
+          <li><b>Section-level actions</b> (Copy / All / + Add / Clear) sit where the section is, which is what you asked for.</li>
+          <li><b>A URL preview strip</b> at the bottom keeps the real string in sight and copyable.</li>
+        </ul>
+        <h4 style="margin-top:18px">What it makes hard</h4>
+        <ul class="pros bad">
+          <li><b>At 440px the rail scrolls sideways</b> and you cannot see all four sections at once — the design wants the wider popup.</li>
+          <li><b>One section at a time.</b> Comparing a path segment against a query value means two clicks and a lost place.</li>
+          <li><b>The URL and its parts are never in the same view</b> except as that dim preview strip.</li>
+          <li><b>No character selection</b>, and no way to act on parts from two different sections together.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section id="f">
+  <div class="proto ">
+    <div class="proto-head">
+      <span class="letter" style="background:var(--pink)">F</span>
+      <h3>Hover Cards</h3>
+      <span class="badge">no menus at all</span>
+      <p class="thesis">The URL stays the whole interface. Point at any part and its actions come to you in a small card.</p>
+    </div>
+    <div class="proto-body">
+      <div class="stage">
+        <div class="frame-shell">
+          <div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="label">F · Hover Cards</span>
+            <a class="pop" href="prototypes/p6-hovercards.html" target="_blank" rel="noopener">open in its own tab ↗</a></div>
+          <iframe class="demo popup-demo" src="prototypes/p6-hovercards.html" title="Prototype F, Hover Cards" loading="lazy"></iframe>
+        </div>
+        <div class="try">
+          <b>Try this</b>
+          <ol>
+            <li>Hover <code>price_desc</code> — a card appears under it with the decoded value and Copy / Edit / Delete.</li>
+            <li>Click a part instead to <b>pin</b> the card, so you can reach the buttons without careful hovering.</li>
+            <li>Hover the <b>QUERY</b> pill at the top to light up that whole run of the URL.</li>
+            <li>Hover the <code>ref</code> value and use <b>inside</b> to peel the nested URL.</li>
+          </ol>
+        </div>
+      </div>
+      <div>
+        <h4>What it makes easy</h4>
+        <ul class="pros good">
+          <li><b>Nothing is in the way.</b> No permanent toolbar, no drawer; the URL gets the whole popup.</li>
+          <li><b>The action is where your eye already is</b> — no travel between the part and its buttons.</li>
+          <li><b>Pinning fixes the usual hover complaint</b>: click and the card stays put.</li>
+          <li><b>Section pills</b> give whole-portion selection without spending vertical space.</li>
+        </ul>
+        <h4 style="margin-top:18px">What it makes hard</h4>
+        <ul class="pros bad">
+          <li><b>Fiddly at 440px.</b> Short parts are small targets and the card can land over its neighbours. It is markedly better at 800.</li>
+          <li><b>Nothing is discoverable.</b> A first-time user sees a coloured URL and no affordances at all until they happen to hover.</li>
+          <li><b>Hover is not a real input</b> on touch, and it is awkward for keyboard and screen-reader users — the weakest of the five on accessibility.</li>
+          <li><b>One part at a time.</b> No multi-select, so no "copy these three parameters".</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section id="g">
+  <div class="proto ">
+    <div class="proto-head">
+      <span class="letter" style="background:var(--blue)">G</span>
+      <h3>Action Bar</h3>
+      <span class="badge">muscle memory</span>
+      <p class="thesis">One action bar, always in the same place. Select a section or a part and the bar's buttons swap — nothing ever opens or closes.</p>
+    </div>
+    <div class="proto-body">
+      <div class="stage">
+        <div class="frame-shell">
+          <div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="label">G · Action Bar</span>
+            <a class="pop" href="prototypes/p7-actionbar.html" target="_blank" rel="noopener">open in its own tab ↗</a></div>
+          <iframe class="demo popup-demo" src="prototypes/p7-actionbar.html" title="Prototype G, Action Bar" loading="lazy"></iframe>
+        </div>
+        <div class="try">
+          <b>Try this</b>
+          <ol>
+            <li>Click <code>price_desc</code> in the URL — the bar below lights up with Copy / Decoded / Edit / Dup / Delete / Decode.</li>
+            <li>Now press <kbd>C</kbd>. Every button carries its key, and the keys work whenever something is selected.</li>
+            <li>Shift-click a neighbouring part to extend the selection, then Copy — they join the way the URL joins them.</li>
+            <li>Click the <b>QUERY</b> pill for section-level actions in the same bar.</li>
+          </ol>
+        </div>
+      </div>
+      <div>
+        <h4>What it makes easy</h4>
+        <ul class="pros good">
+          <li><b>The actions never move.</b> After five minutes you stop reading the buttons and just hit the keys — the strongest of the five for a tool you open fifty times a day.</li>
+          <li><b>Nothing opens or closes</b>, so there is no state to lose and no menu to dismiss.</li>
+          <li><b>Multi-select with shift-click</b>, and the bar tells you how many parts you have.</li>
+          <li><b>Keyboard shortcuts are printed on the buttons</b>, so the fast path teaches itself.</li>
+        </ul>
+        <h4 style="margin-top:18px">What it makes hard</h4>
+        <ul class="pros bad">
+          <li><b>It spends permanent vertical space</b> on a bar that is empty until you select something.</li>
+          <li><b>Everything is two steps</b> — select, then act. D and F both get there in one.</li>
+          <li><b>Six buttons at 440px</b> is cramped; labels shrink to near-glyphs.</li>
+          <li><b>No character selection</b>, and the bar has no room for the decode stack, so Decode pushes a strip in underneath.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section id="h">
+  <div class="proto ">
+    <div class="proto-head">
+      <span class="letter" style="background:var(--lavender)">H</span>
+      <h3>Command Bar</h3>
+      <span class="badge">for the keyboard</span>
+      <p class="thesis">The URL on top, one input underneath. Type to find a part, press a key to act on it. The input doubles as the editor.</p>
+    </div>
+    <div class="proto-body">
+      <div class="stage">
+        <div class="frame-shell">
+          <div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="label">H · Command Bar</span>
+            <a class="pop" href="prototypes/p8-command.html" target="_blank" rel="noopener">open in its own tab ↗</a></div>
+          <iframe class="demo popup-demo" src="prototypes/p8-command.html" title="Prototype H, Command Bar" loading="lazy"></iframe>
+        </div>
+        <div class="try">
+          <b>Try this</b>
+          <ol>
+            <li>Type <code>sort</code> — the matching parameter lights up in the URL above and appears as the only result.</li>
+            <li>Press <kbd>Enter</kbd>: the same input becomes "edit param value" with the value armed. Type and commit.</li>
+            <li>Type <code>utm_source=newsletter</code> and press Enter to add a parameter — or set one that already exists.</li>
+            <li>Try the prefixes: <code>&gt;</code> commands, <code>?</code> query, <code>/</code> path, <code>#</code> fragment, <code>@</code> host.</li>
+          </ol>
+        </div>
+      </div>
+      <div>
+        <h4>What it makes easy</h4>
+        <ul class="pros good">
+          <li><b>By far the fastest</b> once you know it. Find and edit are the same gesture in the same field.</li>
+          <li><b>It scales to the monster URL</b> better than anything else here — 13 parameters is a non-event when you type two letters to reach one.</li>
+          <li><b>Add and set are one syntax.</b> <code>name=value</code> adds it, or replaces the value if the name exists.</li>
+          <li><b>The URL stays highlighted above</b>, so you always see where the thing you are editing lives.</li>
+        </ul>
+        <h4 style="margin-top:18px">What it makes hard</h4>
+        <ul class="pros bad">
+          <li><b>The language is invisible.</b> Five prefixes to learn, and nothing on screen forces you to learn them.</li>
+          <li><b>A mouse user gets almost nothing</b> — the section pills, and that is it.</li>
+          <li><b>The results list pushes the URL up</b> the moment you type, so the thing you are editing moves.</li>
+          <li><b>It is the least "touching it with your hands"</b> of the eight. It is fast, but it is a command line wearing a URL.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<div class="round" id="round1">
+  <span class="n">round 1</span>
+  <h2>The first three, still standing</h2>
+  <p class="said">These answered the original brief. A is still the only one where you can select
+    arbitrary characters, and B is still the best with an awful URL — both are worth stealing from
+    whatever wins.</p>
+</div>
+
+<section id="a">
+  <div class="proto ">
+    <div class="proto-head">
+      <span class="letter" style="background:var(--mauve)">A</span>
+      <h3>Live Line</h3>
+      <span class="badge">round 1 · the literal reading</span>
+      <p class="thesis">The URL <em>is</em> the input: one editable line, coloured in place, with a real caret in it.</p>
+    </div>
+    <div class="proto-body">
+      <div class="stage">
+        <div class="frame-shell">
+          <div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="label">A · Live Line</span>
+            <a class="pop" href="prototypes/p1-inline.html" target="_blank" rel="noopener">open in its own tab ↗</a></div>
+          <iframe class="demo popup-demo" src="prototypes/p1-inline.html" title="Prototype A, Live Line" loading="lazy"></iframe>
+        </div>
+        <div class="try">
+          <b>Try this</b>
+          <ol>
+            <li>Drag across <code>%3A%2F%2F</code> — an arbitrary run of characters, exactly as in any text field.</li>
+            <li>Double-click a part to snap the selection to it; <kbd>Alt</kbd>+<kbd>↑</kbd> grows part → parameter → query → whole URL.</li>
+            <li>Select a value and type: the space becomes <code>%20</code> as it lands.</li>
+          </ol>
+        </div>
+      </div>
+      <div>
+        <h4>What it makes easy</h4>
+        <ul class="pros good">
+          <li><b>The only one that does character selection</b>, because it is real text.</li>
+          <li><b>What you see is what gets navigated to</b> — no translation in your head.</li>
+          <li><b>Typing punctuation restructures the URL</b>: <code>&amp;</code> makes a parameter, <code>/</code> splits a segment.</li>
+        </ul>
+        <h4 style="margin-top:18px">What it makes hard</h4>
+        <ul class="pros bad">
+          <li><b>Raw is unreadable</b> — the panel decodes whatever you stand on, but the line itself stays ugly.</li>
+          <li><b>Aiming on a long URL is fiddly</b>; the keyboard hops are the real answer.</li>
+          <li><b>You can break it</b>, and no drag-to-reorder.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section id="b">
+  <div class="proto ">
+    <div class="proto-head">
+      <span class="letter" style="background:var(--teal)">B</span>
+      <h3>Bricks</h3>
+      <span class="badge">round 1 · the departure</span>
+      <p class="thesis">The URL is not text, it is a handful of objects: pick them up, reorder them, pull one apart, walk inside it.</p>
+    </div>
+    <div class="proto-body">
+      <div class="stage">
+        <div class="frame-shell">
+          <div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="label">B · Bricks</span>
+            <a class="pop" href="prototypes/p2-bricks.html" target="_blank" rel="noopener">open in its own tab ↗</a></div>
+          <iframe class="demo popup-demo" src="prototypes/p2-bricks.html" title="Prototype B, Bricks" loading="lazy"></iframe>
+        </div>
+        <div class="try">
+          <b>Try this</b>
+          <ol>
+            <li>Click <code>tags</code>, then <kbd>⇧</kbd>-click <code>debug</code> → four parameters selected; <b>Copy</b> gives real URL text.</li>
+            <li>Drag <code>catalog</code> before <code>eu</code>. Dashed yellow means "moved, unapplied".</li>
+            <li>Click <code>ref</code> → <b>Inside</b>: the nested URL opens as its own bricks, then <b>Put it back</b>.</li>
+          </ol>
+        </div>
+      </div>
+      <div>
+        <h4>What it makes easy</h4>
+        <ul class="pros good">
+          <li><b>Best density of the eight</b> — the 13-parameter monster URL fits with no scrolling at all.</li>
+          <li><b>Drag to reorder</b>, multi-select copy, split a delimited value, walk inside a nested URL.</li>
+          <li><b>Deletions stay on screen as ghosts</b> you can click to restore.</li>
+        </ul>
+        <h4 style="margin-top:18px">What it makes hard</h4>
+        <ul class="pros bad">
+          <li><b>No character selection across bricks</b> — the one thing in your original list it cannot do.</li>
+          <li><b>No URL text to trust</b>, so it needs the dim preview strip at the bottom.</li>
+          <li><b>New vocabulary to learn</b>, and punctuation is not yours to type.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section id="c">
+  <div class="proto ">
+    <div class="proto-head">
+      <span class="letter" style="background:var(--yellow)">C</span>
+      <h3>Split</h3>
+      <span class="badge">round 1 · the two-way</span>
+      <p class="thesis">A real text field of the raw URL over a list of parts, wired both ways: select characters and the part lights up, click a part and its characters get selected.</p>
+    </div>
+    <div class="proto-body">
+      <div class="stage">
+        <div class="frame-shell">
+          <div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="label">C · Split</span>
+            <a class="pop" href="prototypes/p3-split.html" target="_blank" rel="noopener">open in its own tab ↗</a></div>
+          <iframe class="demo popup-demo" src="prototypes/p3-split.html" title="Prototype C, Split" loading="lazy"></iframe>
+        </div>
+        <div class="try">
+          <b>Try this</b>
+          <ol>
+            <li>Drag across characters in the top line — the strip names what you grabbed and the matching row lights teal.</li>
+            <li>Hover a row to glow its characters above; click it to really select them.</li>
+            <li>Paste a completely different URL into the top line — it takes itself apart as you type.</li>
+          </ol>
+        </div>
+      </div>
+      <div>
+        <h4>What it makes easy</h4>
+        <ul class="pros good">
+          <li><b>Both kinds of selection with no trade</b>: characters in the field, parts in the list.</li>
+          <li><b>It teaches the structure</b> — the only design that shows you the mapping.</li>
+          <li><b>Paste any URL to take it apart.</b></li>
+        </ul>
+        <h4 style="margin-top:18px">What it makes hard</h4>
+        <ul class="pros bad">
+          <li><b>Two views of one URL cost double the height</b> — the worst fit for a short bar.</li>
+          <li><b>Two right answers for every edit</b>: up there or down here?</li>
+          <li><b>The bottom half is still a form.</b></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<hr class="rule">
+
+<section id="compare">
+  <div class="sec-head">
+    <div class="eyebrow">Side by side</div>
+    <h2>Two decisions, not eight</h2>
+    <p class="lede">Every prototype here is a choice of <b>shell</b> (how the URL is laid out and how
+      much room it gets) crossed with an <b>action mechanism</b> (how you reach what you can do to a
+      part). They mix freely — that is what makes this a two-question decision rather than a
+      beauty contest.</p>
+  </div>
+
+  <figure style="margin-bottom:26px">
+    <svg viewBox="0 0 700 250" role="img" aria-labelledby="fig3t fig3d">
+      <title id="fig3t">Shell and action mechanism are independent choices</title>
+      <desc id="fig3d">A grid: the shell choice runs down the left, the action mechanism across the
+        top, and each prototype sits where its two choices meet.</desc>
+
+      <text x="0" y="14" font-size="11" fill="var(--mauve)" font-weight="700">SHELL</text>
+      <text x="150" y="14" font-size="11" fill="var(--mauve)" font-weight="700">ACTION MECHANISM</text>
+
+      <g font-size="10.5" fill="var(--muted)">
+        <text x="150" y="38">menu</text>
+        <text x="245" y="38">hover</text>
+        <text x="335" y="38">fixed bar</text>
+        <text x="445" y="38">typing</text>
+        <text x="540" y="38">direct</text>
+      </g>
+
+      <g font-size="10.5" fill="var(--muted)">
+        <text x="0" y="70">wide bar, 800</text>
+        <text x="0" y="112">popup, 440</text>
+        <text x="0" y="154">popup, 440</text>
+        <text x="0" y="196">popup, 440</text>
+      </g>
+
+      <g>
+        <rect x="140" y="56" width="70" height="20" rx="5" fill="rgba(166,227,161,0.18)" stroke="var(--green)"/>
+        <text x="152" y="70" font-size="10.5" fill="var(--green)">E · bar</text>
+
+        <rect x="140" y="98" width="70" height="20" rx="5" fill="var(--surface0)" stroke="var(--surface1)"/>
+        <text x="150" y="112" font-size="10.5" fill="var(--peach)">D · rail</text>
+
+        <rect x="235" y="98" width="72" height="20" rx="5" fill="var(--surface0)" stroke="var(--surface1)"/>
+        <text x="243" y="112" font-size="10.5" fill="var(--pink)">F · cards</text>
+
+        <rect x="325" y="140" width="80" height="20" rx="5" fill="var(--surface0)" stroke="var(--surface1)"/>
+        <text x="333" y="154" font-size="10.5" fill="var(--blue)">G · action</text>
+
+        <rect x="435" y="140" width="76" height="20" rx="5" fill="var(--surface0)" stroke="var(--surface1)"/>
+        <text x="443" y="154" font-size="10.5" fill="var(--lavender)">H · command</text>
+
+        <rect x="530" y="182" width="66" height="20" rx="5" fill="var(--surface0)" stroke="var(--surface1)"/>
+        <text x="538" y="196" font-size="10.5" fill="var(--mauve)">A · line</text>
+        <rect x="602" y="182" width="72" height="20" rx="5" fill="var(--surface0)" stroke="var(--surface1)"/>
+        <text x="610" y="196" font-size="10.5" fill="var(--teal)">B · bricks</text>
+      </g>
+
+      <text x="0" y="232" font-size="11" fill="var(--surface2)">Nothing stops E's shell carrying G's action bar, or H's typing. The grid has empty cells on purpose.</text>
+    </svg>
+    <figcaption>The grid is the actual decision. Pick a row and a column and I will build that.</figcaption>
+  </figure>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th style="width:22%">&nbsp;</th><th>E · Bar</th><th>D · Rail</th><th>F · Hover</th><th>G · Actions</th><th>H · Command</th><th>A · Line</th><th>B · Bricks</th><th>C · Split</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="k">whole URL visible</td><td class="yes">yes, 3 lines</td><td class="meh">preview strip</td><td class="yes">yes</td><td class="yes">yes</td><td class="yes">yes</td><td class="yes">yes</td><td class="no">no, chips</td><td class="yes">yes</td></tr>
+        <tr><td class="k">select chars</td><td class="no">no</td><td class="no">no</td><td class="no">no</td><td class="no">no</td><td class="no">no</td><td class="yes">yes</td><td class="no">no</td><td class="yes">yes</td></tr>
+        <tr><td class="k">select a portion</td><td class="yes">section cell</td><td class="yes">section cell</td><td class="yes">section pill</td><td class="yes">section pill</td><td class="yes">prefix scope</td><td class="yes">pill / Alt+↑</td><td class="yes">gutter glyph</td><td class="yes">group header</td></tr>
+        <tr><td class="k">type over a part</td><td class="yes">in the bar</td><td class="yes">in the row</td><td class="yes">in the line</td><td class="yes">in the line</td><td class="yes">in the input</td><td class="yes">in the line</td><td class="yes">in the brick</td><td class="yes">in the row</td></tr>
+        <tr><td class="k">act on several parts</td><td class="meh">section only</td><td class="yes">All + rows</td><td class="no">one</td><td class="yes">shift-click</td><td class="no">one</td><td class="yes">selection</td><td class="yes">shift/⌘-click</td><td class="no">one</td></tr>
+        <tr><td class="k">monster URL</td><td class="yes">fine at 800</td><td class="yes">fine at 800</td><td class="meh">fiddly</td><td class="meh">busy</td><td class="yes">best</td><td class="meh">6 lines</td><td class="yes">no scroll</td><td class="no">both halves</td></tr>
+        <tr><td class="k">nested URL</td><td class="yes">peel in drawer</td><td class="yes">peel in row</td><td class="yes">inside</td><td class="yes">decode strip</td><td class="yes">inside</td><td class="meh">panel</td><td class="yes">own bricks</td><td class="meh">read-only</td></tr>
+        <tr><td class="k">discoverable</td><td class="yes">yes</td><td class="yes">yes</td><td class="no">nothing shows</td><td class="yes">yes</td><td class="no">hidden language</td><td class="meh">looks plain</td><td class="meh">new idioms</td><td class="yes">yes</td></tr>
+        <tr><td class="k">keyboard</td><td class="meh">partial</td><td class="yes">full</td><td class="meh">partial</td><td class="yes">full, printed</td><td class="yes">built on it</td><td class="yes">full</td><td class="yes">full</td><td class="meh">partial</td></tr>
+        <tr><td class="k">height used</td><td class="yes">~190px</td><td class="meh">~420px</td><td class="yes">~300px</td><td class="meh">~420px</td><td class="meh">~500px</td><td class="meh">~600px</td><td class="meh">~500px</td><td class="no">~600px</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card" style="margin-top:22px;border-color:var(--surface1)">
+    <h4>What I would build</h4>
+    <p style="margin:10px 0 0">
+      <strong>E's shell.</strong> You were right that the width changes the thing: at 800 the whole URL
+      is simply <em>there</em>, and the popup stops looking like a panel and starts looking like part of
+      the browser. Everything else gets easier once the URL fits.
+    </p>
+    <p style="margin:12px 0 0">
+      <strong>Plus G's action bar instead of E's drawer.</strong> The drawer is the weakest part of E —
+      it repeats the bar and doubles the height. A fixed action row in the same place, with the keys
+      printed on it, keeps the popup short and gets rid of the "same thing twice" problem.
+      <strong>Plus H's input as an optional line</strong> for the power path: type two letters to reach
+      a parameter instead of aiming at a one-character target.
+    </p>
+    <p style="margin:12px 0 0">
+      The one thing none of that gives you is <strong>dragging a selection through the URL</strong>.
+      If that matters, the bar has to be a real text field — that is A, and it costs the coloured
+      section cells. Question 3 below asks you exactly that.
+    </p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section id="decide">
+  <div class="sec-head">
+    <div class="eyebrow">Your call</div>
+    <h2>Four questions</h2>
+    <p class="lede">Answer what you have an opinion on and press <b>Record</b> on each. Your answers
+      collect in the box at the bottom, ready to copy to whoever builds this next. Skipping one is a
+      fine answer — the default gets taken and said out loud.</p>
+  </div>
+
+  <form class="q" data-lavish-question="shell" onsubmit="queueAnswer(event, 'shell', 'Shell')">
+    <h3>1 · Which shell?</h3>
+    <p class="why">How the URL is laid out, and how much room the popup takes.</p>
+    <div class="opts">
+      <label class="opt"><input type="radio" name="shell" value="E - the wide second address bar, 800 wide and short">
+        <span><span class="t">E · the second address bar</span><br><span class="d">800 wide, ~190 tall, sections as cells. What you just described.</span></span></label>
+      <label class="opt"><input type="radio" name="shell" value="wide but shorter still - bar only, no drawer">
+        <span><span class="t">Wider still — bar only, no drawer</span><br><span class="d">Keep E's bar, drop the drawer entirely; actions go in a single row. The shortest possible popup.</span></span></label>
+      <label class="opt"><input type="radio" name="shell" value="D - the rail with section panels">
+        <span><span class="t">D · the rail</span><br><span class="d">Sections as tabs, one roomy panel at a time. Better lists, taller popup.</span></span></label>
+      <label class="opt"><input type="radio" name="shell" value="keep the 440 popup">
+        <span><span class="t">Stay narrow at 440</span><br><span class="d">The classic popup. Less coverage of the page, more scrolling.</span></span></label>
+    </div>
+    <textarea name="notes" placeholder="How wide is too wide? Did 800 feel right, or should it be 600?"></textarea>
+    <div style="margin-top:12px"><button class="submit" type="submit">Record</button><span class="queued" data-for="shell"></span></div>
+  </form>
+
+  <form class="q" data-lavish-question="actions" onsubmit="queueAnswer(event, 'actions', 'Actions')">
+    <h3>2 · How do you reach the actions?</h3>
+    <p class="why">This is independent of question 1 — any of these can live in any shell.</p>
+    <div class="opts">
+      <label class="opt"><input type="radio" name="actions" value="dropdown per section (D/E)">
+        <span><span class="t">A dropdown per section</span><br><span class="d">What E and D do now. Roomy, obvious, costs height.</span></span></label>
+      <label class="opt"><input type="radio" name="actions" value="fixed action bar (G)">
+        <span><span class="t">One fixed action bar (G)</span><br><span class="d">Always in the same place, keys printed on the buttons. My pick.</span></span></label>
+      <label class="opt"><input type="radio" name="actions" value="hover cards (F)">
+        <span><span class="t">Hover cards (F)</span><br><span class="d">Actions come to the part under your pointer. Lightest, least discoverable.</span></span></label>
+      <label class="opt"><input type="radio" name="actions" value="a command input (H)">
+        <span><span class="t">A command input (H)</span><br><span class="d">Type to find, keys to act. Fastest, steepest.</span></span></label>
+    </div>
+    <textarea name="notes" placeholder="Or a mix — e.g. 'fixed bar, plus the command input as a second line'"></textarea>
+    <div style="margin-top:12px"><button class="submit" type="submit">Record</button><span class="queued" data-for="actions"></span></div>
+  </form>
+
+  <form class="q" data-lavish-question="chars" onsubmit="queueAnswer(event, 'chars', 'Character selection')">
+    <h3>3 · Do you still want to drag-select characters?</h3>
+    <p class="why">It is the one thing the wide bar cannot do. Coloured section cells and a real text
+      caret are mutually exclusive — a text field cannot hold buttons, and spans cannot hold a caret.</p>
+    <div class="opts">
+      <label class="opt"><input type="radio" name="chars" value="yes - the bar must be real text">
+        <span><span class="t">Yes, it matters</span><br><span class="d">Make the bar a real text field (A's trick) and give up the in-bar cells; structure moves entirely to the drawer/action bar.</span></span></label>
+      <label class="opt"><input type="radio" name="chars" value="no - parts are enough">
+        <span><span class="t">No, parts are enough</span><br><span class="d">Selecting whole parts and sections covers it. Keep the cells.</span></span></label>
+      <label class="opt"><input type="radio" name="chars" value="both - a toggle between text mode and parts mode">
+        <span><span class="t">Both, as a toggle</span><br><span class="d">One button flips the bar between "parts" and "raw text". More to build, no compromise.</span></span></label>
+    </div>
+    <div style="margin-top:4px"><button class="submit" type="submit">Record</button><span class="queued" data-for="chars"></span></div>
+  </form>
+
+  <form class="q" data-lavish-question="functions" onsubmit="queueAnswer(event, 'functions', 'Functions')">
+    <h3>4 · “Smarter, with more functions” — which ones?</h3>
+    <p class="why">Tick what earns its place in the first real build. Unticked goes to the backlog, not the bin.</p>
+    <div class="opts">
+      <label class="opt"><input type="checkbox" name="functions" value="Clean - strip utm_ and tracking params">
+        <span><span class="t">⚡ Clean</span><span class="d"> — one click strips <code>utm_*</code>, <code>fbclid</code>, <code>gclid</code> and friends. Live in E; try it on the monster URL.</span></span></label>
+      <label class="opt"><input type="checkbox" name="functions" value="decoded view of the whole URL">
+        <span><span class="t">Decoded view</span><span class="d"> — flip the whole bar to what the URL says. Live in E.</span></span></label>
+      <label class="opt"><input type="checkbox" name="functions" value="copy section raw or decoded">
+        <span><span class="t">Copy a whole section</span><span class="d"> — raw or decoded, e.g. the entire query.</span></span></label>
+      <label class="opt"><input type="checkbox" name="functions" value="walk inside a nested URL">
+        <span><span class="t">Walk inside a nested URL</span><span class="d"> — edit <code>ref=https%3A%2F%2F…</code> as its own URL and push it back. Live in B.</span></span></label>
+      <label class="opt"><input type="checkbox" name="functions" value="decode stack for base64 / JSON / JWT">
+        <span><span class="t">The decode stack</span><span class="d"> — base64, JSON and JWT values made readable.</span></span></label>
+      <label class="opt"><input type="checkbox" name="functions" value="drag to reorder parts">
+        <span><span class="t">Drag to reorder</span><span class="d"> — live in B.</span></span></label>
+      <label class="opt"><input type="checkbox" name="functions" value="paste any URL to take it apart">
+        <span><span class="t">Paste any URL to take it apart</span><span class="d"> — not just the tab's. Live in C.</span></span></label>
+      <label class="opt"><input type="checkbox" name="functions" value="per-site presets / saved param sets">
+        <span><span class="t">Per-site presets</span><span class="d"> — saved parameter sets per host. Not built yet; needs <code>storage</code>.</span></span></label>
+    </div>
+    <textarea name="notes" placeholder="Anything else that would make it smarter than the real address bar?"></textarea>
+    <div style="margin-top:12px"><button class="submit" type="submit">Record</button><span class="queued" data-for="functions"></span></div>
+  </form>
+
+  <div class="card" style="margin-top:26px">
+    <h4>What happens next</h4>
+    <p class="small" style="margin:10px 0 0">The shell and actions you pick get built as one proper
+      prototype rather than eight sketches, and brought back for another look. Nothing touches the
+      extension itself until the feel is right.</p>
+  </div>
+
+  <div class="card answers" id="answers" style="margin-top:16px" hidden>
+    <h4>Your answers</h4>
+    <p class="small" style="margin:8px 0 10px">Copy this and hand it to whoever builds the next step.</p>
+    <pre id="answers-text"></pre>
+    <div style="margin-top:10px"><button class="submit" type="button" id="answers-copy">Copy answers</button><span class="queued" id="answers-flag"></span></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+// --- demo size toggle: only the popup-shaped demos, E has its own size ---
+document.getElementById('size-seg').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-w]');
+  if (!btn) return;
+  for (const b of e.currentTarget.querySelectorAll('button')) b.setAttribute('aria-pressed', 'false');
+  btn.setAttribute('aria-pressed', 'true');
+  for (const f of document.querySelectorAll('iframe.popup-demo')) {
+    f.style.width = btn.dataset.w + 'px';
+    f.style.height = btn.dataset.h + 'px';
+  }
+});
+
+// --- standalone: collect answers on the page, in question order ---
+const ORDER = ['shell', 'actions', 'chars', 'functions'];
+const recorded = {};
+function recordLocally(key, prompt, form) {
+  recorded[key] = prompt;
+  const text = ORDER.filter(k => recorded[k]).map(k => recorded[k]).join('\n\n');
+  document.getElementById('answers-text').textContent = text;
+  document.getElementById('answers').hidden = false;
+  const flag = form.querySelector('.queued');
+  if (flag) flag.textContent = '✓ recorded below';
+}
+document.getElementById('answers-copy').addEventListener('click', async () => {
+  const text = document.getElementById('answers-text').textContent;
+  const flag = document.getElementById('answers-flag');
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // file:// and sandboxed frames can refuse the async clipboard; select it for a manual copy.
+    const range = document.createRange();
+    range.selectNodeContents(document.getElementById('answers-text'));
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    if (!document.execCommand('copy')) { flag.textContent = 'selected — press Ctrl+C'; return; }
+  }
+  flag.textContent = '✓ copied';
+});
+
+// --- queue one answer per question ---
+function queueAnswer(event, key, label) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const data = new FormData(form);
+  const picked = data.getAll(key).filter(Boolean);
+  const notes = (data.get('notes') || '').toString().trim();
+  if (picked.length === 0 && !notes) return;
+
+  const answer = picked.join('; ');
+  const prompt = `${label}: ${answer || '(no option picked)'}` + (notes ? `\nNotes: ${notes}` : '');
+
+  if (!window.lavish || !window.lavish.queuePrompt) {
+    recordLocally(key, prompt, form);
+    return;
+  }
+  window.lavish.queuePrompt(prompt, {
+    tag: 'decision',
+    text: `${label} — ${answer || 'notes only'}`,
+    element: form,
+    queueKey: key,
+    data: { question: key, answer, notes },
+  });
+
+  const flag = form.querySelector('.queued');
+  if (flag) {
+    flag.textContent = '✓ queued — press Send to Agent when you are done';
+    setTimeout(() => { flag.textContent = '✓ queued'; }, 4000);
+  }
+}
+</script>
+</body>
+</html>

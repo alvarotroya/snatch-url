@@ -1,0 +1,1905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Snatch URL · G · Action Bar</title>
+<style>
+/* Shared chrome for the three prototypes.
+   Catppuccin Mocha, same stack as the shipped popup (styles.css), so the
+   comparison is about the editing surface and not about the paint. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --base: #1e1e2e;
+  --mantle: #181825;
+  --crust: #11111b;
+  --surface0: #313244;
+  --surface1: #45475a;
+  --surface2: #585b70;
+  --text: #cdd6f4;
+  --muted: #a6adc8;
+  --mauve: #cba6f7;
+  --blue: #89b4fa;
+  --green: #a6e3a1;
+  --peach: #fab387;
+  --yellow: #f9e2af;
+  --red: #f38ba8;
+  --teal: #94e2d5;
+  --lavender: #b4befe;
+  --pink: #f5c2e7;
+  --staged: #f9e2af;
+  --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+/* One colour per role, identical in all three prototypes. */
+.r-scheme, .r-sep, .r-qmark, .r-eq, .r-amp { color: var(--surface2); }
+.r-host { color: var(--mauve); }
+.r-userinfo { color: var(--pink); }
+.r-port { color: var(--pink); }
+.r-seg { color: var(--peach); }
+.r-key { color: var(--blue); }
+.r-val { color: var(--green); }
+.r-hash { color: var(--teal); }
+
+html, body { height: 100%; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  background: var(--base);
+  color: var(--text);
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* --- Demo scaffolding (NOT part of any design) --- */
+.demo-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--crust);
+  border-bottom: 1px dashed var(--surface1);
+  font-size: 10px;
+  color: var(--surface2);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.demo-bar .demo-tag { color: var(--surface2); margin-right: 2px; }
+.demo-bar button {
+  background: transparent;
+  border: 1px solid var(--surface0);
+  border-radius: 999px;
+  color: var(--muted);
+  font: inherit;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.demo-bar button[aria-pressed="true"] { background: var(--surface0); color: var(--text); border-color: var(--surface1); }
+.demo-bar .spacer { flex: 1; }
+
+/* --- Header --- */
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 9px 12px 7px;
+  background: var(--mantle);
+  border-bottom: 1px solid var(--surface0);
+  flex-shrink: 0;
+}
+header h1 {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mauve);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+header .variant {
+  font-size: 11px;
+  color: var(--muted);
+  flex: 1;
+  text-align: right;
+}
+
+/* --- Shared bottom bars --- */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--surface0);
+  background: var(--mantle);
+  flex-shrink: 0;
+}
+.change-summary { flex: 1; font-size: 11px; color: var(--muted); min-width: 0; }
+.status-bar.dirty .change-summary { color: var(--staged); font-weight: 600; }
+
+.btn {
+  background: var(--surface0);
+  border: 1px solid var(--surface1);
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  padding: 4px 9px;
+  white-space: nowrap;
+  transition: background 0.1s, border-color 0.1s;
+}
+.btn:hover { background: var(--surface1); }
+.btn-primary { background: var(--mauve); border-color: var(--mauve); color: var(--base); font-weight: 600; }
+.btn-primary:hover { background: var(--lavender); border-color: var(--lavender); }
+.btn-danger { color: var(--red); }
+.btn-danger:hover { background: #3d2a2e; border-color: var(--red); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+.btn:disabled:hover { background: var(--surface0); }
+.btn-primary:disabled:hover { background: var(--mauve); }
+
+.toast {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 46px;
+  padding: 7px 10px;
+  border-radius: 5px;
+  background: #2a3d2e;
+  color: var(--green);
+  border: 1px solid var(--green);
+  font-size: 12px;
+  z-index: 40;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+.toast.err { background: #3d2a2e; color: var(--red); border-color: var(--red); }
+.hidden { display: none !important; }
+
+:focus-visible { outline: 2px solid var(--mauve); outline-offset: 1px; }
+
+/* Thin scrollbars everywhere. */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface1); border-radius: 3px; }
+
+/* --- Keyboard hint strip --- */
+.keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 5px 12px;
+  background: var(--crust);
+  border-top: 1px solid var(--surface0);
+  font-size: 10px;
+  color: var(--surface2);
+  flex-shrink: 0;
+}
+.keys kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--surface0);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+/* --- Badges --- */
+.badge {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 3px;
+  padding: 1px 4px;
+  background: var(--surface0);
+  color: var(--muted);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  vertical-align: 1px;
+}
+.badge.encoded { color: var(--yellow); }
+.badge.url { color: var(--teal); }
+.badge.base64, .badge.jwt { color: var(--pink); }
+.badge.json { color: var(--lavender); }
+
+</style>
+<style>
+/* --- G: one bar, fixed in place, whose contents follow the selection ---
+   No menus. The URL sits above, a strip of section handles above that, and
+   every action lives in the same row of buttons under the URL. Pick a part or
+   a section, the bar swaps its contents; the buttons never move. */
+
+/* --- section strip: HOST · PATH · QUERY · # --- */
+#strip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px 0;
+  flex-shrink: 0;
+}
+#strip button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--surface0);
+  border-radius: 999px;
+  color: var(--muted);
+  padding: 2px 9px;
+  cursor: pointer;
+}
+#strip button .n {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0;
+  color: var(--surface2);
+}
+#strip button:hover { background: var(--surface0); color: var(--text); }
+#strip button.g-origin { color: var(--mauve); }
+#strip button.g-path { color: var(--peach); }
+#strip button.g-query { color: var(--blue); }
+#strip button.g-hash { color: var(--teal); }
+#strip button.empty { opacity: 0.45; }
+#strip button.in { border-color: var(--surface2); }
+#strip button.on { border-color: currentColor; background: rgba(203, 166, 247, 0.1); opacity: 1; }
+#strip button.dirty::after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--staged);
+}
+#strip .dot { color: var(--surface1); font-size: 11px; }
+#strip .hint { margin-left: auto; font-size: 10px; color: var(--surface2); }
+
+/* --- the URL, horizontal, wrapping --- */
+#line-wrap { padding: 7px 12px 8px; flex-shrink: 0; }
+#line {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.75;
+  background: var(--crust);
+  border: 1px solid var(--surface0);
+  border-radius: 6px;
+  padding: 6px 9px;
+  min-height: 42px;
+  max-height: 138px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  user-select: none;
+  outline: none;
+  cursor: default;
+}
+#line.long { font-size: 11.5px; line-height: 1.7; }
+#line:focus-visible { border-color: var(--mauve); outline: none; }
+
+.tk {
+  border-radius: 3px;
+  padding: 1px 0;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.pt { cursor: pointer; }
+.pt:hover { background: rgba(255, 255, 255, 0.07); }
+.pu { cursor: pointer; }
+.pu:hover { color: var(--muted); }
+.tk.sel { background: rgba(203, 166, 247, 0.22); }
+.tk.sel.pu { color: var(--lavender); }
+.tk.focus { box-shadow: 0 0 0 1px var(--mauve); }
+.tk.changed { box-shadow: inset 0 -2px 0 var(--staged); }
+.tk.focus.changed { box-shadow: 0 0 0 1px var(--mauve), inset 0 -2px 0 var(--staged); }
+
+#line input {
+  font: inherit;
+  background: var(--base);
+  border: 1px solid var(--mauve);
+  border-radius: 3px;
+  color: var(--text);
+  padding: 0 3px;
+  margin: -1px 0;
+  outline: none;
+  max-width: 100%;
+  vertical-align: baseline;
+}
+
+/* --- the action bar: fixed height, contents swap --- */
+#bar {
+  flex-shrink: 0;
+  height: 68px;
+  padding: 7px 12px 8px;
+  background: var(--mantle);
+  border-top: 1px solid var(--surface0);
+  border-bottom: 1px solid var(--surface0);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  overflow: hidden;
+}
+#bar .what {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 16px;
+  font-size: 11px;
+  color: var(--muted);
+  min-width: 0;
+}
+#bar .what .role {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--surface2);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+#bar .what .val {
+  font-family: var(--mono);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+#bar.idle .what .val { color: var(--surface2); font-family: inherit; }
+#bar .what .badge { flex-shrink: 0; }
+#bar .acts { display: flex; gap: 4px; overflow: hidden; }
+
+.act {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface0);
+  border: 1px solid var(--surface1);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  padding: 4px 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.1s, border-color 0.1s;
+}
+.act:hover { background: var(--surface1); }
+.act kbd {
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 14px;
+  color: var(--muted);
+  background: var(--crust);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+.act.danger { color: var(--red); }
+.act.danger:hover { background: #3d2a2e; border-color: var(--red); }
+.act.on { border-color: var(--mauve); color: var(--mauve); }
+.act:disabled { opacity: 0.35; cursor: default; }
+.act:disabled:hover { background: var(--surface0); border-color: var(--surface1); }
+
+/* --- below the bar: the decode stack, or a one-line hint --- */
+#below {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 12px 10px;
+}
+.hint { font-size: 11px; color: var(--surface2); line-height: 1.5; }
+.hint b { color: var(--muted); font-weight: 600; }
+.hint kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--surface0);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+.dec-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--surface2);
+  margin-bottom: 6px;
+}
+.dec-head b {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+}
+.dec-head .spacer { flex: 1; }
+.layer { margin-bottom: 7px; }
+.layer-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--surface2);
+  margin-bottom: 2px;
+}
+.layer-label .arrow { color: var(--surface1); }
+.layer pre {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  background: var(--crust);
+  border: 1px solid var(--surface0);
+  border-radius: 4px;
+  padding: 5px 7px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 62px;
+  overflow-y: auto;
+}
+.layer textarea {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--crust);
+  border: 1px solid var(--surface1);
+  border-radius: 4px;
+  padding: 5px 7px;
+  resize: vertical;
+  min-height: 34px;
+  outline: none;
+}
+.layer textarea:focus { border-color: var(--mauve); }
+.dec-actions { display: flex; align-items: center; gap: 5px; margin-top: 6px; }
+.dec-actions .note { flex: 1; font-size: 10px; color: var(--surface2); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="demo-bar">
+    <span class="demo-tag">demo url</span>
+    <button data-sample="short">short</button>
+    <button data-sample="typical" aria-pressed="true">typical</button>
+    <button data-sample="monster">monster</button>
+    <span class="spacer"></span>
+    <span>440 × 600</span>
+  </div>
+
+  <header>
+    <h1>Snatch URL</h1>
+    <span class="variant">G · Action Bar</span>
+  </header>
+
+  <div id="strip" role="toolbar" aria-label="Sections">
+    <button data-group="origin" class="g-origin" title="Select the origin">host</button>
+    <span class="dot">·</span>
+    <button data-group="path" class="g-path" title="Select the whole path">path <span class="n"></span></button>
+    <span class="dot">·</span>
+    <button data-group="query" class="g-query" title="Select the whole query">query <span class="n"></span></button>
+    <span class="dot">·</span>
+    <button data-group="hash" class="g-hash" title="Select the fragment">#</button>
+    <span class="hint">click a section, or a part below</span>
+  </div>
+
+  <div id="line-wrap">
+    <div id="line" tabindex="0" role="listbox" aria-multiselectable="true" aria-label="URL"></div>
+  </div>
+
+  <div id="bar" class="idle">
+    <div class="what">
+      <span class="role" id="what-role"></span>
+      <span class="val" id="what-val"></span>
+      <span id="what-badge"></span>
+    </div>
+    <div class="acts" id="acts"></div>
+  </div>
+
+  <div id="below"></div>
+
+  <div class="keys">
+    <span><kbd>click</kbd> part</span>
+    <span><kbd>⇧click</kbd> range</span>
+    <span><kbd>⌘click</kbd> add</span>
+    <span><kbd>←→</kbd> walk</span>
+    <span><kbd>⇧←→</kbd> extend</span>
+    <span><kbd>↑↓</kbd> section ⇄ part</span>
+    <span><kbd>dbl-click</kbd> edit</span>
+    <span><kbd>esc</kbd> clear</span>
+  </div>
+
+  <div class="status-bar" id="status-bar">
+    <span class="change-summary" id="change-summary" role="status">No unapplied changes</span>
+    <button class="btn" id="revert-btn" disabled>Revert</button>
+    <button class="btn" id="new-btn" disabled>New tab</button>
+    <button class="btn btn-primary" id="apply-btn" disabled>Apply</button>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+</div>
+
+<script type="module">
+// Bundled by build.js - see that file for why this is inline.
+// ---- url-model.js ----
+// Snatch URL - url-model.js
+//
+// A raw-preserving URL model.
+//
+// The rule this module exists for: an edit must change only the part it
+// touches. Every untouched byte of the path and query survives a parse ->
+// build round trip exactly as it arrived, so `%20` stays `%20`, `a,b` stays
+// `a,b`, a bare `debug` stays bare, and a trailing slash is kept.
+//
+// To do that the model stores the RAW text of every segment and every
+// key/value, and only re-encodes the single part an edit touches. Decoded
+// text is carried alongside for display, and decoding never throws: a
+// malformed escape like `%zz` falls back to the raw text.
+
+// --- Encoding ---
+
+// Characters that are legal unescaped inside a path segment (RFC 3986 pchar:
+// sub-delims plus ":" and "@"). encodeURIComponent escapes them, so we put
+// them back, which is what keeps `me@corp.com` readable in a segment.
+const SEGMENT_KEEP = /%(2C|3B|3A|40|24|26|2B|3D|21|27|28|29|2A)/gi;
+
+// Same idea for a query part, minus the characters that would end or split
+// the part itself: `&`, `=`, `+` and `#` stay escaped.
+const QUERY_KEEP = /%(2C|3B|3A|40|24|2F|3F|21|27|28|29|2A)/gi;
+
+function encodeWith(keep, text) {
+  return encodeURIComponent(text).replace(keep, m => decodeURIComponent(m));
+}
+
+function encodeSegment(text) {
+  return encodeWith(SEGMENT_KEEP, text);
+}
+
+function encodeQueryPart(text) {
+  return encodeWith(QUERY_KEEP, text);
+}
+
+// --- Decoding ---
+
+/** decodeURIComponent that returns the raw text instead of throwing. */
+function safeDecode(raw) {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+/** A query part also decodes `+` as a space, the way a browser form does. */
+function decodeQueryPart(raw) {
+  try {
+    return decodeURIComponent(raw.replace(/\+/g, '%20'));
+  } catch {
+    return raw.replace(/\+/g, ' ');
+  }
+}
+
+// --- Parse ---
+
+/**
+ * @typedef {Object} Segment
+ * @property {string} raw   the segment exactly as it appears in the URL
+ * @property {string} text  the decoded segment, for display and editing
+ *
+ * @typedef {Object} Entry
+ * @property {string} rawKey
+ * @property {string|null} rawValue  null for a bare flag such as `debug`
+ * @property {string} key
+ * @property {string} value
+ *
+ * @typedef {Object} UrlModel
+ * @property {string} href           the original URL, untouched
+ * @property {string} prefix         everything before the path (scheme, host, port)
+ * @property {Segment[]} segments
+ * @property {boolean} trailingSlash
+ * @property {Entry[]} entries
+ * @property {boolean} hasQuery      whether the URL carried a `?` at all
+ * @property {string} hash           the raw hash including `#`, or ''
+ */
+
+/**
+ * @param {string} url
+ * @returns {UrlModel|null} null when the URL cannot be parsed
+ */
+function parseUrl(url) {
+  let u;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+
+  const tail = u.pathname + u.search + u.hash;
+  const prefix = u.href.endsWith(tail)
+    ? u.href.slice(0, u.href.length - tail.length)
+    : u.origin;
+
+  return {
+    href: u.href,
+    prefix,
+    ...parsePath(u.pathname),
+    entries: parseQuery(u.search),
+    hasQuery: u.search !== '',
+    hash: u.hash,
+  };
+}
+
+function parsePath(pathname) {
+  // An empty path segment is real (`/a//b`) and is preserved, so this keeps
+  // every `/` the URL had. Only a trailing one is lifted out into a flag.
+  const parts = pathname.startsWith('/') ? pathname.slice(1).split('/') : pathname.split('/');
+  let trailingSlash = false;
+  if (parts.length > 0 && parts[parts.length - 1] === '') {
+    parts.pop();
+    trailingSlash = true;
+  }
+  return {
+    segments: parts.map(raw => ({ raw, text: safeDecode(raw) })),
+    trailingSlash,
+  };
+}
+
+function parseQuery(search) {
+  const q = search.startsWith('?') ? search.slice(1) : search;
+  if (q === '') return [];
+  // An empty chunk (`a=1&&b=2`) carries nothing to edit, so it is dropped.
+  return q.split('&').filter(chunk => chunk !== '').map(toEntry);
+}
+
+function toEntry(chunk) {
+  const eq = chunk.indexOf('=');
+  const rawKey = eq === -1 ? chunk : chunk.slice(0, eq);
+  const rawValue = eq === -1 ? null : chunk.slice(eq + 1);
+  return {
+    rawKey,
+    rawValue,
+    key: decodeQueryPart(rawKey),
+    value: rawValue === null ? '' : decodeQueryPart(rawValue),
+  };
+}
+
+// --- Build ---
+
+/** @param {UrlModel} model @returns {string} */
+function buildUrl(model) {
+  return model.prefix + buildPath(model) + buildQuery(model) + model.hash;
+}
+
+function buildPath({ segments, trailingSlash }) {
+  if (segments.length === 0) return '/';
+  return '/' + segments.map(s => s.raw).join('/') + (trailingSlash ? '/' : '');
+}
+
+function buildQuery({ entries }) {
+  // Emptying the query drops the `?` too, which is what Clear All should do.
+  if (entries.length === 0) return '';
+  return '?' + entries
+    .map(e => (e.rawValue === null ? e.rawKey : e.rawKey + '=' + e.rawValue))
+    .join('&');
+}
+
+// --- Edits ---
+//
+// Every edit returns a result rather than throwing, so the popup can put a
+// rejected value back and show a message. Rejected edits leave the model
+// untouched.
+
+const OK = { ok: true };
+function reject(error) {
+  return { ok: false, error };
+}
+
+const BLANK_SEGMENT = 'Segment cannot be empty.';
+const BLANK_KEY = 'Key cannot be empty.';
+
+/** Replace one path segment. A blank segment is rejected (F6). */
+function setSegment(model, index, text) {
+  const trimmed = text.trim();
+  if (trimmed === '') return reject(BLANK_SEGMENT);
+  model.segments[index] = { raw: encodeSegment(trimmed), text: trimmed };
+  return OK;
+}
+
+function deleteSegment(model, index) {
+  model.segments.splice(index, 1);
+  return OK;
+}
+
+/** Rename one query param. A blank key is rejected (F6). */
+function setKey(model, index, text) {
+  const trimmed = text.trim();
+  if (trimmed === '') return reject(BLANK_KEY);
+  const entry = model.entries[index];
+  entry.rawKey = encodeQueryPart(trimmed);
+  entry.key = trimmed;
+  return OK;
+}
+
+/**
+ * Set one query value. Clearing the value of a bare flag leaves it bare, so
+ * `debug` does not silently become `debug=`.
+ */
+function setValue(model, index, text) {
+  const entry = model.entries[index];
+  if (text === '' && entry.rawValue === null) return OK;
+  entry.rawValue = encodeQueryPart(text);
+  entry.value = text;
+  return OK;
+}
+
+function deleteEntry(model, index) {
+  model.entries.splice(index, 1);
+  return OK;
+}
+
+/** Append a new query param. A blank key is rejected, as Add already did. */
+function addEntry(model, key, value) {
+  const trimmedKey = key.trim();
+  if (trimmedKey === '') return reject(BLANK_KEY);
+  model.entries.push({
+    rawKey: encodeQueryPart(trimmedKey),
+    rawValue: encodeQueryPart(value),
+    key: trimmedKey,
+    value,
+  });
+  model.hasQuery = true;
+  return OK;
+}
+
+function clearEntries(model) {
+  model.entries.length = 0;
+  return OK;
+}
+
+// --- Export ---
+
+/**
+ * The model as plain JSON, for Copy All: the decoded path segments in order,
+ * and the query as an object where a key that repeats carries an array of its
+ * values, so `tag=a&tag=b` is not flattened to the last one (F5).
+ *
+ * @param {UrlModel} model
+ * @returns {{path: string[], query: Object}}
+ */
+function toJson(model) {
+  // A null prototype so a key such as `__proto__` is an ordinary own property.
+  const query = Object.create(null);
+  for (const { key, value } of model.entries) {
+    if (!Object.hasOwn(query, key)) query[key] = value;
+    else if (Array.isArray(query[key])) query[key].push(value);
+    else query[key] = [query[key], value];
+  }
+  return { path: model.segments.map(s => s.text), query };
+}
+
+// ---- proto-core.js ----
+// Shared brain for the three UX prototypes.
+//
+// It sits on top of the SHIPPED url-model.js, and adds the one thing every
+// "touch the URL directly" design needs and the current popup does not have:
+// a map from each part of the URL to the exact character range it occupies in
+// the URL string. Selection, highlighting, copy-a-piece and type-over-a-piece
+// are all splices into that string.
+//
+// Nothing here re-implements parsing or encoding: parseUrl/buildUrl/encode*
+// come from the model, so the raw-preserving invariant still holds.
+
+
+
+// --- Sample URLs -------------------------------------------------------
+// Demo scaffolding, not part of any design. Three lengths so each design can
+// be felt short, typical and awful.
+
+const SAMPLES = {
+  short: 'https://example.com/docs/guide?page=2',
+  typical:
+    'https://shop.example.com:8443/eu/catalog/women%27s%20shoes/item'
+    + '?q=running%20shoes&sort=price_desc&tags=sale,new'
+    + '&ref=https%3A%2F%2Fpartner.io%2Fgo%3Fcid%3D42%26utm%3Demail'
+    + '&debug&tag=a&tag=b#reviews',
+  monster:
+    'https://analytics.example.co.uk:8443/v2/reports/2026/q3/campaign%20roll-up/export'
+    + '?state=eyJ1c2VyIjoiYWx2YXJvIiwicm9sZSI6ImFkbWluIiwic2NvcGUiOlsicmVhZCIsIndyaXRlIl19'
+    + '&filters=country%3Ade%2Ces%7Cdevice%3Amobile%7Cplan%3Apro%2Cteam'
+    + '&from=2026-07-01&to=2026-09-30&granularity=week&currency=EUR'
+    + '&next=https%3A%2F%2Fapp.example.co.uk%2Fdash%3Ftab%3Dspend%26range%3D90d'
+    + '&utm_source=newsletter&utm_medium=email&utm_campaign=q3%20wrap&debug#panel-spend',
+};
+
+// --- Tokens ------------------------------------------------------------
+//
+// A token is one part of the URL plus where it lives in the string.
+//
+// role      what kind of part it is (drives colour and what you can do to it)
+// start,end character range in the canonical URL text
+// raw       the characters as they appear in the URL
+// text      the decoded characters, for display and for editing
+// index     position among siblings (segment index, entry index)
+// editable  whether typing over it is a defined operation
+// group     'origin' | 'path' | 'query' | 'hash'
+
+const ROLE_LABEL = {
+  scheme: 'scheme',
+  userinfo: 'user info',
+  host: 'host',
+  port: 'port',
+  sep: 'separator',
+  seg: 'path segment',
+  qmark: 'separator',
+  key: 'param name',
+  eq: 'separator',
+  val: 'param value',
+  amp: 'separator',
+  hash: 'fragment',
+};
+
+const PUNCT = new Set(['sep', 'qmark', 'eq', 'amp', 'scheme']);
+
+function isPunct(role) {
+  return PUNCT.has(role);
+}
+
+/**
+ * Parse a URL into a model plus offset-mapped tokens.
+ *
+ * The text the tokens index into is buildUrl(model), not the input string:
+ * the model drops a few meaningless things (an empty `&&` chunk), so building
+ * from it is the only way offsets are guaranteed to line up with what the user
+ * sees. For every URL that survives a round trip - which is every URL the
+ * model's tests cover - the two are byte for byte identical.
+ *
+ * @returns {{ok: boolean, text?: string, model?: object, tokens?: object[], error?: string}}
+ */
+function tokenize(url) {
+  const model = parseUrl(url);
+  if (!model) return { ok: false, error: 'Not a URL.' };
+
+  let u;
+  try {
+    u = new URL(url);
+  } catch {
+    return { ok: false, error: 'Not a URL.' };
+  }
+
+  const tokens = [];
+  let pos = 0;
+
+  const push = (role, raw, extra = {}) => {
+    const token = {
+      role,
+      raw,
+      text: extra.text !== undefined ? extra.text : raw,
+      start: pos,
+      end: pos + raw.length,
+      group: extra.group || 'origin',
+      index: extra.index,
+      editable: !isPunct(role),
+      id: `${role}-${extra.index ?? tokens.length}`,
+      ...extra,
+    };
+    tokens.push(token);
+    pos = token.end;
+    return token;
+  };
+
+  // Origin. Rebuilt part by part so the pieces add up to model.prefix; if the
+  // arithmetic ever disagrees the whole origin is emitted as one opaque token
+  // rather than producing offsets that lie.
+  const origin = [
+    ['scheme', u.protocol + '//'],
+    u.username ? ['userinfo', u.username + (u.password ? ':' + u.password : '') + '@'] : null,
+    ['host', u.hostname],
+    u.port ? ['port', ':' + u.port] : null,
+  ].filter(Boolean);
+
+  if (origin.map(([, raw]) => raw).join('') === model.prefix) {
+    for (const [role, raw] of origin) push(role, raw, { group: 'origin' });
+  } else {
+    push('host', model.prefix, { group: 'origin' });
+  }
+
+  // Path
+  if (model.segments.length === 0) {
+    push('sep', '/', { group: 'path' });
+  } else {
+    model.segments.forEach((seg, index) => {
+      push('sep', '/', { group: 'path' });
+      push('seg', seg.raw, { text: seg.text, index, group: 'path', id: `seg-${index}` });
+    });
+    if (model.trailingSlash) push('sep', '/', { group: 'path' });
+  }
+
+  // Query
+  if (model.entries.length > 0) {
+    push('qmark', '?', { group: 'query' });
+    model.entries.forEach((entry, index) => {
+      if (index > 0) push('amp', '&', { group: 'query' });
+      push('key', entry.rawKey, { text: entry.key, index, group: 'query', id: `key-${index}` });
+      if (entry.rawValue !== null) {
+        push('eq', '=', { group: 'query' });
+        push('val', entry.rawValue, { text: entry.value, index, group: 'query', id: `val-${index}` });
+      }
+    });
+  }
+
+  if (model.hash) push('hash', model.hash, { text: safeDecode(model.hash.slice(1)), group: 'hash' });
+
+  return { ok: true, text: buildUrl(model), model, tokens };
+}
+
+/** The token containing a character offset (ties go to the token that starts there). */
+function tokenAt(tokens, offset) {
+  return tokens.find(t => offset >= t.start && offset < t.end)
+    || tokens.find(t => offset === t.end)
+    || null;
+}
+
+/**
+ * Every token the range [from,to) touches. A caret (a zero-width range)
+ * touches one - and when that one is punctuation but a real part ends exactly
+ * there, the part wins: after typing at the end of a value the caret sits on
+ * the `&`, and the user is still working on the value.
+ */
+function tokensIn(tokens, from, to) {
+  if (from === to) {
+    const here = tokenAt(tokens, from);
+    if (here && isPunct(here.role)) {
+      const before = tokens.find(t => t.end === from && !isPunct(t.role));
+      if (before) return [before];
+    }
+    return here ? [here] : [];
+  }
+  return tokens.filter(t => t.start < to && t.end > from);
+}
+
+/** The character range covering a whole group, e.g. the entire query. */
+function groupRange(tokens, group) {
+  const inGroup = tokens.filter(t => t.group === group);
+  if (inGroup.length === 0) return null;
+  return { start: inGroup[0].start, end: inGroup[inGroup.length - 1].end };
+}
+
+/**
+ * The encoder that belongs to a role: typing `a b` into a path segment has to
+ * produce `a%20b`, and into a param value `a%20b` too, but the two roles keep
+ * different characters legible (see url-model.js).
+ */
+function encodeFor(role, text) {
+  if (role === 'seg') return encodeSegment(text);
+  if (role === 'key' || role === 'val') return encodeQueryPart(text);
+  if (role === 'hash') return '#' + encodeURI(text).replace(/#/g, '%23');
+  return text;
+}
+
+/** Splice new RAW text into the URL at a character range. */
+function spliceRaw(text, start, end, raw) {
+  return text.slice(0, start) + raw + text.slice(end);
+}
+
+/** Type over one token: encodes for its role, then splices. */
+function retype(text, token, newText) {
+  return spliceRaw(text, token.start, token.end, encodeFor(token.role, newText));
+}
+
+// --- Value inspection --------------------------------------------------
+//
+// What a value really is, peeled one layer at a time. This is what makes an
+// encoded value or a nested URL touchable instead of a wall of %3A%2F%2F.
+
+const B64 = /^[A-Za-z0-9+/_-]{12,}={0,2}$/;
+
+function tryBase64(s) {
+  if (!B64.test(s)) return null;
+  try {
+    const decoded = atob(s.replace(/-/g, '+').replace(/_/g, '/'));
+    // Only call it base64 if what comes out is plausible text.
+    if (!/^[\x09\x0a\x0d\x20-\x7e]+$/.test(decoded)) return null;
+    if (decoded.length < 4) return null;
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
+function tryJson(s) {
+  const t = s.trim();
+  if (!/^[[{]/.test(t)) return null;
+  try {
+    return JSON.stringify(JSON.parse(t), null, 2);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Peel a raw value into layers. Each layer is what you get after one more
+ * decoding step, and the last one is the most human form of the value.
+ *
+ * @returns {{kind: string, label: string, text: string, isUrl: boolean}[]}
+ */
+function peel(raw) {
+  const layers = [{ kind: 'raw', label: 'as written', text: raw, isUrl: false }];
+  let current = raw;
+
+  const decoded = decodeQueryPart(current);
+  if (decoded !== current) {
+    current = decoded;
+    layers.push({ kind: 'percent', label: 'percent-decoded', text: current, isUrl: false });
+  }
+
+  if (/^https?:\/\/\S+$/i.test(current.trim())) {
+    layers[layers.length - 1].isUrl = true;
+    return layers;
+  }
+
+  const jwtParts = current.split('.');
+  if (jwtParts.length === 3 && jwtParts.every(p => tryBase64(p) || p.length > 8)) {
+    const head = tryBase64(jwtParts[0]);
+    const body = tryBase64(jwtParts[1]);
+    if (head && body) {
+      const pretty = [head, body].map(p => tryJson(p) || p).join('\n---\n');
+      layers.push({ kind: 'jwt', label: 'JWT header + payload', text: pretty, isUrl: false });
+      return layers;
+    }
+  }
+
+  const b64 = tryBase64(current);
+  if (b64) {
+    current = b64;
+    layers.push({ kind: 'base64', label: 'base64-decoded', text: current, isUrl: false });
+  }
+
+  const json = tryJson(current);
+  if (json) layers.push({ kind: 'json', label: 'JSON', text: json, isUrl: false });
+
+  return layers;
+}
+
+/** A one-word badge for a value that is hiding something. */
+function badgeFor(raw) {
+  const layers = peel(raw);
+  if (layers.length === 1) return null;
+  const last = layers[layers.length - 1];
+  if (last.isUrl) return 'url';
+  return { percent: 'encoded', base64: 'base64', json: 'json', jwt: 'jwt' }[last.kind] || null;
+}
+
+// --- Staged diff -------------------------------------------------------
+
+/** Which tokens differ from the URL the tab is on, by id. */
+function changedIds(baseTokens, workTokens) {
+  const base = new Map(baseTokens.filter(t => t.editable).map(t => [t.id, t.raw]));
+  const changed = new Set();
+  for (const t of workTokens) {
+    if (!t.editable) continue;
+    if (!base.has(t.id) || base.get(t.id) !== t.raw) changed.add(t.id);
+  }
+  return changed;
+}
+
+/**
+ * How many parts the user has touched.
+ *
+ * Counting by token id is wrong the moment something is deleted: every later
+ * part shifts its index, so `key-3` now holds what `key-4` used to and the
+ * whole tail reads as edited. So this compares the two token lists as
+ * multisets of (role, raw) instead: one edit is one part gone and one part
+ * arrived, a delete is one gone, an add is one arrived.
+ */
+function countChanges(baseText, workText, baseTokens, workTokens) {
+  if (baseText === workText) return 0;
+
+  // A parameter counts as ONE thing, so deleting `tags=sale,new` is one
+  // change rather than two (its name and its value).
+  const bag = tokens => {
+    const m = new Map();
+    const params = new Map();
+    for (const t of tokens) {
+      if (!t.editable) continue;
+      if (t.role === 'key' || t.role === 'val') {
+        const cur = params.get(t.index) || { key: '', val: null };
+        if (t.role === 'key') cur.key = t.raw; else cur.val = t.raw;
+        params.set(t.index, cur);
+        continue;
+      }
+      const k = `${t.role}\u0000${t.raw}`;
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    for (const p of params.values()) {
+      const k = `param\u0000${p.key}\u0000${p.val}`;
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    return m;
+  };
+  const a = bag(baseTokens);
+  const b = bag(workTokens);
+
+  let gone = 0;
+  let arrived = 0;
+  for (const [k, n] of a) gone += Math.max(0, n - (b.get(k) || 0));
+  for (const [k, n] of b) arrived += Math.max(0, n - (a.get(k) || 0));
+
+  return Math.max(1, gone, arrived);
+}
+
+// ---- page ----
+
+
+const $ = id => document.getElementById(id);
+
+// --- state --------------------------------------------------------------
+
+let baseText = '';       // the URL the tab is on
+let text = '';           // the edited draft
+let baseTok = null;
+let tok = null;
+
+// The selection is either nothing, a whole section, or a set of parts.
+// Parts are referenced by their index in tok.tokens; every edit re-tokenizes,
+// so after one the selection is restored by token id.
+let sel = { kind: 'none' };   // | { kind: 'section', group } | { kind: 'parts', anchor, focus }
+let picked = new Set();
+let decodeOpen = false;
+let editing = null;           // { index, undo, then, done, input }
+
+const GROUP_LABEL = { origin: 'host', path: 'path', query: 'query', hash: 'fragment' };
+const BADGE_WORD = {
+  encoded: 'percent-encoding', url: 'a nested URL', base64: 'base64', json: 'JSON', jwt: 'a JWT',
+};
+const DELETABLE = new Set(['seg', 'key', 'val', 'hash', 'port', 'userinfo']);
+
+function setText(next) {
+  const r = tokenize(next);
+  if (!r.ok) { flash(r.error, true); return false; }
+  text = r.text;
+  tok = r;
+  return true;
+}
+
+function load(url) {
+  const r = tokenize(url);
+  baseTok = tok = r;
+  baseText = text = r.text;
+  sel = { kind: 'none' };
+  picked = new Set();
+  decodeOpen = false;
+  editing = null;
+  render();
+}
+
+// --- helpers ------------------------------------------------------------
+
+const parts = () => tok.tokens.map((t, i) => (t.editable ? i : -1)).filter(i => i >= 0);
+const partsIn = g => parts().filter(i => tok.tokens[i].group === g);
+const single = () => (sel.kind === 'parts' && picked.size === 1 ? [...picked][0] : null);
+const ordered = () => [...picked].sort((a, b) => a - b);
+const indexOfId = id => tok.tokens.findIndex(t => t.id === id);
+
+function contiguous() {
+  const o = ordered();
+  if (o.length < 2) return true;
+  const ps = parts();
+  return ps.slice(ps.indexOf(o[0]), ps.indexOf(o.at(-1)) + 1).every(i => picked.has(i));
+}
+
+function keyNameOf(t) {
+  const k = tok.tokens.find(x => x.role === 'key' && x.index === t.index);
+  return k ? k.text : '';
+}
+
+function paramTokens(index) {
+  return tok.tokens.filter(x => (x.role === 'key' || x.role === 'eq' || x.role === 'val') && x.index === index);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+/**
+ * Which work tokens are not in the base URL. Compared as a multiset of
+ * (role, raw) rather than by id, so a delete does not light up the whole tail
+ * (see countChanges in proto-core.js).
+ */
+function changedSet() {
+  const count = new Map();
+  for (const t of baseTok.tokens) {
+    if (!t.editable) continue;
+    const k = t.role + '\u0000' + t.raw;
+    count.set(k, (count.get(k) || 0) + 1);
+  }
+  const out = new Set();
+  tok.tokens.forEach((t, i) => {
+    if (!t.editable) return;
+    const k = t.role + '\u0000' + t.raw;
+    const n = count.get(k) || 0;
+    if (n > 0) count.set(k, n - 1); else out.add(i);
+  });
+  return out;
+}
+
+function groupDirty(g) {
+  const a = groupRange(baseTok.tokens, g);
+  const b = groupRange(tok.tokens, g);
+  return (a ? baseText.slice(a.start, a.end) : '') !== (b ? text.slice(b.start, b.end) : '');
+}
+
+// --- selection ----------------------------------------------------------
+
+function selectPart(i, e) {
+  const ps = parts();
+  if (e && e.shiftKey && sel.kind === 'parts') {
+    const a = sel.anchor;
+    picked = new Set(ps.filter(p => p >= Math.min(a, i) && p <= Math.max(a, i)));
+    sel = { kind: 'parts', anchor: a, focus: i };
+  } else if (e && (e.metaKey || e.ctrlKey) && sel.kind === 'parts') {
+    if (picked.has(i)) picked.delete(i); else picked.add(i);
+    sel = picked.size ? { kind: 'parts', anchor: i, focus: i } : { kind: 'none' };
+  } else {
+    picked = new Set([i]);
+    sel = { kind: 'parts', anchor: i, focus: i };
+  }
+  // The decode strip follows a single selection and folds away for anything else.
+  if (single() === null) decodeOpen = false;
+  render();
+}
+
+function selectSection(g) {
+  sel = { kind: 'section', group: g };
+  picked = new Set();
+  decodeOpen = false;
+  render();
+}
+
+function clearSelection() {
+  sel = { kind: 'none' };
+  picked = new Set();
+  decodeOpen = false;
+  render();
+}
+
+function reselect(id, role) {
+  let i = indexOfId(id);
+  if (i < 0 && role) {
+    const same = tok.tokens.map((t, j) => (t.role === role ? j : -1)).filter(j => j >= 0);
+    if (same.length === 1) i = same[0];
+  }
+  if (i < 0) { sel = { kind: 'none' }; picked = new Set(); return; }
+  picked = new Set([i]);
+  sel = { kind: 'parts', anchor: i, focus: i };
+}
+
+// --- the action table: one source of truth for buttons AND keys ---------
+
+function actions() {
+  if (sel.kind === 'section') {
+    const g = sel.group;
+    const gr = groupRange(tok.tokens, g);
+    const ps = partsIn(g);
+    return [
+      { id: 'copy', label: 'Copy section', key: 'C', enabled: !!gr,
+        title: 'Copy this whole section as it appears in the URL',
+        run: () => copy(text.slice(gr.start, gr.end)) },
+      { id: 'add', label: 'Add', key: 'A',
+        enabled: g === 'path' || g === 'query' || (g === 'hash' && !gr),
+        title: g === 'path' ? 'Append a path segment' : g === 'query' ? 'Append a parameter' : 'Add a fragment',
+        run: () => addTo(g) },
+      { id: 'clear', label: 'Clear', key: '⌫', danger: true,
+        enabled: !!gr && g !== 'origin' && (g !== 'path' || ps.length > 0),
+        title: 'Remove everything in this section',
+        run: () => clearSection(g) },
+      { id: 'all', label: 'Select all', key: '⇧A', enabled: ps.length > 0,
+        title: 'Select every part in this section',
+        run: () => {
+          picked = new Set(ps);
+          sel = { kind: 'parts', anchor: ps[0], focus: ps.at(-1) };
+          render();
+        } },
+    ];
+  }
+
+  const one = single();
+  const t = one !== null ? tok.tokens[one] : null;
+  const n = picked.size;
+  const hides = t ? peel(t.raw).length > 1 : false;
+  return [
+    { id: 'copy', label: 'Copy', key: 'C', enabled: n > 0,
+      title: 'Copy as written in the URL',
+      run: () => doCopy(false) },
+    { id: 'copy-plain', label: 'Decoded', key: '⇧C', enabled: n > 0,
+      title: 'Copy the decoded, human form',
+      run: () => doCopy(true) },
+    { id: 'edit', label: 'Edit', key: 'E', enabled: !!t,
+      title: 'Type over this part in place (also Enter)',
+      run: () => startEdit(one) },
+    { id: 'dup', label: 'Dup', key: '⇧D',
+      enabled: !!t && (t.role === 'seg' || t.role === 'key' || t.role === 'val'),
+      title: 'Duplicate this segment or parameter right after itself',
+      run: () => duplicate(one) },
+    { id: 'delete', label: 'Delete', key: '⌫', danger: true,
+      enabled: n > 0 && [...picked].some(i => DELETABLE.has(tok.tokens[i].role)),
+      title: 'Delete the selected parts, punctuation included',
+      run: () => deleteParts([...picked]) },
+    { id: 'decode', label: 'Decode', key: 'D', enabled: hides, on: decodeOpen,
+      title: hides ? 'Show what this value hides, layer by layer' : 'Nothing hidden in this part',
+      run: () => { decodeOpen = !decodeOpen; render(); } },
+  ];
+}
+
+function keyMatches(a, e) {
+  const k = e.key;
+  if (a.key === '⌫') return k === 'Backspace' || k === 'Delete';
+  if (a.key === 'E' && k === 'Enter' && !e.shiftKey) return true;
+  const shift = a.key.startsWith('⇧');
+  const letter = a.key.replace('⇧', '').toLowerCase();
+  return k.length === 1 && k.toLowerCase() === letter && e.shiftKey === shift;
+}
+
+// --- render -------------------------------------------------------------
+
+function render() {
+  renderStrip();
+  renderLine();
+  renderBar();
+  renderBelow();
+  renderChrome();
+}
+
+function renderStrip() {
+  for (const btn of $('strip').querySelectorAll('button')) {
+    const g = btn.dataset.group;
+    const has = !!groupRange(tok.tokens, g);
+    const n = g === 'path' ? tok.model.segments.length : g === 'query' ? tok.model.entries.length : null;
+    const nEl = btn.querySelector('.n');
+    if (nEl) nEl.textContent = n;
+    const on = sel.kind === 'section' && sel.group === g;
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', on);
+    btn.classList.toggle('in', sel.kind === 'parts' && [...picked].some(i => tok.tokens[i].group === g));
+    btn.classList.toggle('empty', !has || n === 0);
+    btn.classList.toggle('dirty', groupDirty(g));
+  }
+}
+
+function renderLine() {
+  const line = $('line');
+  line.innerHTML = '';
+  line.classList.toggle('long', text.length > 220);
+  const changed = changedSet();
+  const o = ordered();
+  const lo = o.length ? o[0] : -1;
+  const hi = o.length ? o.at(-1) : -1;
+  const runs = contiguous();
+  const gr = sel.kind === 'section' ? groupRange(tok.tokens, sel.group) : null;
+
+  tok.tokens.forEach((t, i) => {
+    if (editing && editing.index === i) { line.append(editInput(t)); return; }
+    const el = document.createElement('span');
+    el.className = `tk r-${t.role} ${t.editable ? 'pt' : 'pu'}`;
+    el.dataset.i = i;
+    el.textContent = t.raw;
+    if (t.editable) {
+      el.setAttribute('role', 'option');
+      el.setAttribute('aria-label', `${ROLE_LABEL[t.role]} ${t.text}`);
+      el.setAttribute('aria-selected', picked.has(i));
+    } else {
+      el.title = `Select the ${GROUP_LABEL[t.group]}`;
+    }
+    const inParts = picked.has(i) || (runs && !t.editable && i > lo && i < hi);
+    const inSection = gr ? t.start >= gr.start && t.end <= gr.end : false;
+    el.classList.toggle('sel', sel.kind === 'parts' ? inParts : inSection);
+    el.classList.toggle('focus', sel.kind === 'parts' && sel.focus === i);
+    el.classList.toggle('changed', changed.has(i));
+    line.append(el);
+  });
+
+  const f = line.querySelector('.focus');
+  if (f) f.scrollIntoView({ block: 'nearest' });
+}
+
+function whatLine() {
+  if (sel.kind === 'none') return ['', 'Nothing selected - click a part of the URL, or a section above it', null];
+  if (sel.kind === 'section') {
+    const g = sel.group;
+    const gr = groupRange(tok.tokens, g);
+    const m = tok.model;
+    const summary = g === 'origin' ? text.slice(gr.start, gr.end)
+      : g === 'path' ? `${m.segments.length} segment${m.segments.length === 1 ? '' : 's'}`
+        : g === 'query' ? `${m.entries.length} param${m.entries.length === 1 ? '' : 's'}`
+          : gr ? text.slice(gr.start + 1, gr.end) : 'none';
+    return [GROUP_LABEL[g], summary, null];
+  }
+  const n = picked.size;
+  if (n > 1) {
+    const o = ordered();
+    const preview = contiguous()
+      ? text.slice(tok.tokens[o[0]].start, tok.tokens[o.at(-1)].end)
+      : o.map(i => tok.tokens[i].raw).join(' ');
+    return [`${n} parts`, preview, null];
+  }
+  const t = tok.tokens[single()];
+  const role = t.role === 'val' ? `value of ${keyNameOf(t)}` : ROLE_LABEL[t.role];
+  return [role, t.text, badgeFor(t.raw)];
+}
+
+function renderBar() {
+  const bar = $('bar');
+  bar.classList.toggle('idle', sel.kind === 'none');
+  const [role, val, badge] = whatLine();
+  $('what-role').textContent = role;
+  $('what-val').textContent = val;
+  $('what-val').title = val;
+  const b = $('what-badge');
+  b.className = badge ? `badge ${badge}` : '';
+  b.textContent = badge || '';
+
+  const box = $('acts');
+  box.innerHTML = '';
+  for (const a of actions()) {
+    const btn = document.createElement('button');
+    btn.className = 'act' + (a.danger ? ' danger' : '') + (a.on ? ' on' : '');
+    btn.dataset.act = a.id;
+    btn.disabled = !a.enabled;
+    btn.title = a.title || '';
+    if (a.on !== undefined) btn.setAttribute('aria-pressed', !!a.on);
+    btn.innerHTML = `${escapeHtml(a.label)}<kbd>${escapeHtml(a.key)}</kbd>`;
+    box.append(btn);
+  }
+}
+
+function renderBelow() {
+  const box = $('below');
+  box.innerHTML = '';
+  const one = single();
+  if (!decodeOpen || one === null) {
+    const hint = document.createElement('div');
+    hint.className = 'hint';
+    if (sel.kind === 'none') {
+      hint.innerHTML = 'Every action sits in the bar above, in the same place whatever is selected; '
+        + 'the small key on each button works whenever a part is selected.';
+    } else if (one !== null) {
+      const badge = badgeFor(tok.tokens[one].raw);
+      hint.innerHTML = badge
+        ? `This value hides <b>${escapeHtml(BADGE_WORD[badge] || badge)}</b> - <kbd>D</kbd> unfolds it.`
+        : '';
+    } else if (sel.kind === 'parts') {
+      hint.innerHTML = contiguous()
+        ? '<b>Copy</b> joins them as they appear in the URL. <b>Delete</b> takes the punctuation with them.'
+        : 'A gapped selection copies one part per line.';
+    }
+    box.append(hint);
+    return;
+  }
+
+  const t = tok.tokens[one];
+  const layers = peel(t.raw);
+  const last = layers.at(-1);
+  const head = document.createElement('div');
+  head.className = 'dec-head';
+  head.innerHTML = `decode <b>${escapeHtml(t.role === 'val' ? keyNameOf(t) : ROLE_LABEL[t.role])}</b>`
+    + '<span class="spacer"></span>'
+    + '<button class="btn" data-dec="close" title="Fold the stack away (Esc)">Close</button>';
+  box.append(head);
+
+  layers.forEach((l, k) => {
+    const div = document.createElement('div');
+    div.className = 'layer';
+    const isLast = k === layers.length - 1;
+    const arrow = k === 0 ? '' : '<span class="arrow">↓</span> ';
+    const tag = l.isUrl ? ' <span class="badge url">nested url</span>' : '';
+    div.innerHTML = `<div class="layer-label">${arrow}${escapeHtml(l.label)}${tag}</div>`;
+    if (isLast && k > 0) {
+      const ta = document.createElement('textarea');
+      ta.value = l.text;
+      ta.rows = Math.min(8, l.text.split('\n').length + 1);
+      ta.setAttribute('aria-label', `${l.label} form of the value`);
+      ta.dataset.dec = 'text';
+      div.append(ta);
+    } else {
+      const pre = document.createElement('pre');
+      pre.textContent = l.text;
+      div.append(pre);
+    }
+    box.append(div);
+  });
+
+  const row = document.createElement('div');
+  row.className = 'dec-actions';
+  const canWrite = last.kind !== 'jwt';
+  row.innerHTML = `<button class="btn btn-primary" data-dec="write" ${canWrite ? '' : 'disabled'} `
+    + `title="${canWrite ? 'Re-encode through every layer and splice it into the URL (⌘⏎)' : 'A JWT cannot be re-signed here'}">Write back</button>`
+    + '<button class="btn" data-dec="copy" title="Copy this human form">Copy</button>'
+    + `<span class="note">edited here, it goes back through ${layers.length - 1} layer${layers.length === 2 ? '' : 's'}</span>`;
+  box.append(row);
+}
+
+function renderChrome() {
+  const n = countChanges(baseText, text, baseTok.tokens, tok.tokens);
+  $('change-summary').textContent = n === 0 ? 'No unapplied changes' : `${n} change${n === 1 ? '' : 's'} - unapplied`;
+  $('status-bar').classList.toggle('dirty', n > 0);
+  for (const id of ['apply-btn', 'new-btn', 'revert-btn']) $(id).disabled = n === 0;
+}
+
+// --- editing in place ---------------------------------------------------
+
+function editValue(t) {
+  if (t.role === 'port') return t.text.slice(1);
+  return t.text;
+}
+
+function encodeEdit(t, v) {
+  if (t.role === 'port') return v === '' ? '' : ':' + v.replace(/^:/, '');
+  if (t.role === 'hash') return v === '' ? '' : encodeFor('hash', v);
+  return encodeFor(t.role, v);
+}
+
+function editInput(t) {
+  const input = document.createElement('input');
+  const v = editValue(t);
+  input.value = v;
+  input.className = `r-${t.role}`;
+  input.style.width = Math.max(3, v.length + 1) + 'ch';
+  input.setAttribute('aria-label', `Edit ${ROLE_LABEL[t.role]}`);
+  input.spellcheck = false;
+  input.addEventListener('keydown', ev => {
+    ev.stopPropagation();
+    if (ev.key === 'Enter' || ev.key === 'Tab') { ev.preventDefault(); commitEdit(true); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); commitEdit(false); }
+  });
+  // A re-render removes the input and fires blur; only the live editor commits.
+  input.addEventListener('blur', () => { if (editing && editing.input === input) commitEdit(true); });
+  input.addEventListener('input', () => { input.style.width = Math.max(3, input.value.length + 1) + 'ch'; });
+  editing.input = input;
+  return input;
+}
+
+function startEdit(i, opts = {}) {
+  const t = tok.tokens[i];
+  if (!t || !t.editable) return;
+  if (editing) commitEdit(true);
+  decodeOpen = false;
+  picked = new Set([i]);
+  sel = { kind: 'parts', anchor: i, focus: i };
+  editing = { index: i, undo: opts.undo ?? null, then: opts.then ?? null, done: false, input: null };
+  render();
+  editing.input.focus();
+  editing.input.select();          // type-over: the whole part is armed
+}
+
+function commitEdit(ok) {
+  if (!editing || editing.done) return;
+  editing.done = true;
+  const { index, undo, then, input } = editing;
+  const t = tok.tokens[index];
+  const v = input.value;
+  editing = null;
+
+  if (!ok) {
+    if (undo !== null) { setText(undo); sel = { kind: 'none' }; picked = new Set(); }
+    render();
+    $('line').focus();
+    return;
+  }
+  if (v.trim() === '' && (t.role === 'seg' || t.role === 'key' || t.role === 'host')) {
+    flash(`A ${ROLE_LABEL[t.role]} cannot be empty.`, true);
+    if (undo !== null) { setText(undo); sel = { kind: 'none' }; picked = new Set(); }
+    render();
+    return;
+  }
+  if (v !== editValue(t)) {
+    // Only a touched part is re-encoded; an untouched one keeps its bytes.
+    if (!setText(spliceRaw(text, t.start, t.end, encodeEdit(t, v)))) { render(); return; }
+    reselect(t.id, t.role);
+  }
+  if (then) {
+    const j = indexOfId(then);
+    if (j >= 0) { startEdit(j, { undo }); return; }
+  }
+  render();
+  $('line').focus();
+}
+
+// --- actions ------------------------------------------------------------
+
+function doCopy(plain) {
+  const o = ordered();
+  if (!o.length) return;
+  const ts = o.map(i => tok.tokens[i]);
+  let s;
+  if (plain) s = ts.map(t => peel(t.raw).at(-1).text).join('\n');
+  else if (contiguous()) s = text.slice(ts[0].start, ts.at(-1).end);
+  else s = ts.map(t => t.raw).join('\n');
+  copy(s);
+}
+
+function rangeToDelete(t) {
+  // Deleting a part takes its punctuation with it, so the URL stays a URL.
+  let from = t.start;
+  let to = t.end;
+  const all = tok.tokens;
+  const i = all.indexOf(t);
+  if (t.role === 'seg') {
+    if (all[i - 1] && all[i - 1].role === 'sep') from = all[i - 1].start;
+  } else if (t.role === 'key' || t.role === 'val') {
+    const pair = paramTokens(t.index);
+    from = pair[0].start;
+    to = pair[pair.length - 1].end;
+    const before = all[all.indexOf(pair[0]) - 1];
+    const after = all[all.indexOf(pair[pair.length - 1]) + 1];
+    if (before && before.role === 'amp') from = before.start;
+    else if (after && after.role === 'amp') to = after.end;
+    else if (before && before.role === 'qmark') from = before.start;
+  }
+  return [from, to];
+}
+
+function deleteParts(indices) {
+  const list = indices.map(i => tok.tokens[i]).filter(t => DELETABLE.has(t.role));
+  if (!list.length) return;
+  // A key and its value expand to the same range, so overlaps are merged
+  // before anything is cut, then cut back to front so earlier offsets hold.
+  const ranges = list.map(rangeToDelete).sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  for (const r of ranges) {
+    const last = merged.at(-1);
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+    else merged.push([...r]);
+  }
+  let next = text;
+  for (const [from, to] of [...merged].reverse()) next = spliceRaw(next, from, to, '');
+  const at = merged[0][0];
+  const g = list[0].group;
+  const gone = new Set(list.map(t => (t.role === 'key' || t.role === 'val' ? `p${t.index}` : t.id))).size;
+  if (!setText(next)) return;
+
+  // Land on the part now sitting where the first deleted one was, so ⌫ ⌫ ⌫
+  // walks down a run; fall back to the last part left in the same section.
+  const inG = partsIn(g);
+  const nxt = inG.find(i => tok.tokens[i].start >= at) ?? inG.at(-1) ?? null;
+  if (nxt !== null) { picked = new Set([nxt]); sel = { kind: 'parts', anchor: nxt, focus: nxt }; }
+  else { sel = { kind: 'none' }; picked = new Set(); }
+  decodeOpen = false;
+  render();
+  flash(`Deleted ${gone} part${gone === 1 ? '' : 's'}.`);
+}
+
+function duplicate(i) {
+  const t = tok.tokens[i];
+  let next;
+  let id;
+  if (t.role === 'seg') {
+    next = spliceRaw(text, t.end, t.end, '/' + t.raw);
+    id = `seg-${t.index + 1}`;
+  } else if (t.role === 'key' || t.role === 'val') {
+    const pair = paramTokens(t.index);
+    const end = pair.at(-1).end;
+    next = spliceRaw(text, end, end, '&' + text.slice(pair[0].start, end));
+    id = `${t.role}-${t.index + 1}`;
+  } else return;
+  if (!setText(next)) return;
+  reselect(id);
+  render();
+  flash('Duplicated - edit the copy.');
+}
+
+function addTo(g) {
+  const undo = text;
+  if (g === 'path') {
+    const n = tok.model.segments.length;
+    const gr = groupRange(tok.tokens, 'path');
+    const last = tok.tokens.filter(t => t.role === 'seg').at(-1);
+    const next = n === 0 ? spliceRaw(text, gr.start, gr.end, '/new')
+      : spliceRaw(text, last.end, last.end, '/new');
+    if (!setText(next)) return;
+    startEdit(indexOfId(`seg-${n}`), { undo });
+  } else if (g === 'query') {
+    const n = tok.model.entries.length;
+    const next = n === 0
+      ? (() => { const pr = groupRange(tok.tokens, 'path'); return spliceRaw(text, pr.end, pr.end, '?name=value'); })()
+      : (() => { const qr = groupRange(tok.tokens, 'query'); return spliceRaw(text, qr.end, qr.end, '&name=value'); })();
+    if (!setText(next)) return;
+    startEdit(indexOfId(`key-${n}`), { undo, then: `val-${n}` });
+  } else if (g === 'hash') {
+    if (!setText(text + '#section')) return;
+    startEdit(tok.tokens.findIndex(t => t.role === 'hash'), { undo });
+  }
+}
+
+function clearSection(g) {
+  const gr = groupRange(tok.tokens, g);
+  if (!gr) return;
+  const next = spliceRaw(text, gr.start, gr.end, g === 'path' ? '/' : '');
+  if (!setText(next)) return;
+  render();
+  flash(`Cleared the ${GROUP_LABEL[g]}.`);
+}
+
+function runAction(id) {
+  const a = actions().find(x => x.id === id);
+  if (a && a.enabled) a.run();
+}
+
+function writeBack(i, edited) {
+  const t = tok.tokens[i];
+  const layers = peel(t.raw);
+  let v = edited;
+  try {
+    for (let k = layers.length - 1; k >= 1; k -= 1) {
+      const layer = layers[k];
+      const src = layers[k - 1].text;      // what was decoded to produce this layer
+      if (layer.kind === 'json') v = JSON.stringify(JSON.parse(v));
+      else if (layer.kind === 'base64') {
+        v = btoa(v);
+        if (/[-_]/.test(src)) v = v.replace(/\+/g, '-').replace(/\//g, '_');
+        if (!src.endsWith('=')) v = v.replace(/=+$/, '');
+      } else if (layer.kind === 'jwt') throw new Error('A JWT cannot be written back.');
+      // a percent layer is re-applied by encodeFor below
+    }
+  } catch (err) {
+    flash(err instanceof SyntaxError ? 'That is not valid JSON.' : err.message, true);
+    return;
+  }
+  if (!setText(spliceRaw(text, t.start, t.end, encodeEdit(t, v)))) return;
+  reselect(t.id, t.role);
+  render();
+  flash('Written back, re-encoded.');
+}
+
+// --- events -------------------------------------------------------------
+
+$('strip').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-group]');
+  if (btn) selectSection(btn.dataset.group);
+});
+
+$('line').addEventListener('click', e => {
+  if (e.target.tagName === 'INPUT') return;
+  const el = e.target.closest('.tk');
+  if (!el) { clearSelection(); return; }
+  const i = Number(el.dataset.i);
+  if (el.classList.contains('pt')) selectPart(i, e);
+  else selectSection(tok.tokens[i].group);      // punctuation is the section's handle
+});
+
+$('line').addEventListener('dblclick', e => {
+  const el = e.target.closest('.pt');
+  if (el) startEdit(Number(el.dataset.i));
+});
+
+$('acts').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-act]');
+  if (btn && !btn.disabled) runAction(btn.dataset.act);
+});
+
+$('below').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-dec]');
+  if (!btn || btn.disabled) return;
+  const one = single();
+  if (one === null) return;
+  const ta = $('below').querySelector('textarea[data-dec="text"]');
+  if (btn.dataset.dec === 'close') { decodeOpen = false; render(); $('line').focus(); }
+  else if (btn.dataset.dec === 'copy') copy(ta ? ta.value : peel(tok.tokens[one].raw).at(-1).text);
+  else if (btn.dataset.dec === 'write' && ta) writeBack(one, ta.value);
+});
+
+$('below').addEventListener('keydown', e => {
+  if (e.target.tagName !== 'TEXTAREA') return;
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault();
+    const one = single();
+    if (one !== null) writeBack(one, e.target.value);
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    decodeOpen = false;
+    render();
+    $('line').focus();
+  }
+});
+
+document.addEventListener('keydown', e => {
+  const tag = e.target.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable || editing) return;
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key.toLowerCase() === 'c' && sel.kind !== 'none') { e.preventDefault(); runAction('copy'); return; }
+  if (mod || e.altKey) return;
+  if (tag === 'BUTTON' && (e.key === 'Enter' || e.key === ' ')) return;
+
+  const ps = parts();
+  const k = e.key;
+
+  if (k === 'ArrowRight' || k === 'ArrowLeft' || k === 'Home' || k === 'End') {
+    e.preventDefault();
+    if (!ps.length) return;
+    const step = k === 'ArrowRight' ? 1 : -1;
+    let target;
+    if (k === 'Home') target = ps[0];
+    else if (k === 'End') target = ps.at(-1);
+    else if (sel.kind === 'parts') {
+      const at = ps.indexOf(sel.focus);
+      target = ps[Math.max(0, Math.min(ps.length - 1, at + step))];
+    } else if (sel.kind === 'section') {
+      const inG = partsIn(sel.group);
+      const pool = inG.length ? inG : ps;
+      target = step > 0 ? pool[0] : pool.at(-1);
+    } else target = step > 0 ? ps[0] : ps.at(-1);
+    selectPart(target, { shiftKey: e.shiftKey && sel.kind === 'parts' });
+    return;
+  }
+  if (k === 'ArrowUp') {
+    e.preventDefault();
+    if (sel.kind === 'parts') selectSection(tok.tokens[sel.focus].group);
+    else if (sel.kind === 'none') selectSection('origin');
+    return;
+  }
+  if (k === 'ArrowDown') {
+    e.preventDefault();
+    if (sel.kind === 'section') { const inG = partsIn(sel.group); if (inG.length) selectPart(inG[0]); }
+    else if (sel.kind === 'none' && ps.length) selectPart(ps[0]);
+    return;
+  }
+  if (k === 'Escape') {
+    if (decodeOpen) { decodeOpen = false; render(); } else clearSelection();
+    return;
+  }
+  const a = actions().find(x => keyMatches(x, e));
+  if (a) {
+    e.preventDefault();
+    if (a.enabled) a.run();
+  }
+});
+
+// --- chrome -------------------------------------------------------------
+
+function copy(s) {
+  window.__lastCopy = s;      // so a driver can read what went to the clipboard
+  const shown = 'Copied: ' + (s.length > 40 ? s.slice(0, 40) + '…' : s);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(s).then(() => flash(shown), () => flash('Clipboard blocked in this frame.', true));
+  } else flash('Clipboard blocked in this frame.', true);
+}
+
+let toastTimer = null;
+function flash(msg, bad) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.toggle('err', !!bad);
+  el.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 2200);
+}
+
+$('apply-btn').onclick = () => {
+  baseText = text;
+  baseTok = tok;
+  clearSelection();
+  flash('Applied - the tab would navigate here.');
+};
+$('new-btn').onclick = () => flash('Would open a new tab at the edited URL.');
+$('revert-btn').onclick = () => { setText(baseText); clearSelection(); };
+
+for (const btn of document.querySelectorAll('[data-sample]')) {
+  btn.onclick = () => {
+    for (const b of document.querySelectorAll('[data-sample]')) b.setAttribute('aria-pressed', 'false');
+    btn.setAttribute('aria-pressed', 'true');
+    load(SAMPLES[btn.dataset.sample]);
+  };
+}
+
+load(SAMPLES.typical);
+
+</script>
+</body>
+</html>
