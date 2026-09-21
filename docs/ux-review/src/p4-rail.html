@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Snatch URL · D · Rail</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="proto.css">
+<style>
+/* --- D: the URL is a rail of sections, each one a dropdown ------------ */
+
+#app { overflow: hidden; width: 100%; }
+
+/* The rail: one horizontal strip, scrolls sideways, never the page. */
+#rail-wrap { position: relative; flex-shrink: 0; background: var(--mantle); border-bottom: 1px solid var(--surface0); }
+#rail {
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+/* Fades at the edges say "there is more this way". */
+#rail-wrap::before, #rail-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 26px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 1;
+}
+#rail-wrap::before { left: 0; background: linear-gradient(to right, var(--mantle), transparent); }
+#rail-wrap::after { right: 0; background: linear-gradient(to left, var(--mantle), transparent); }
+#rail-wrap.more-left::before, #rail-wrap.more-right::after { opacity: 1; }
+.cell {
+  --sec: var(--muted);
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 12px 8px 10px;
+  border: none;
+  border-right: 1px solid var(--surface0);
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+  position: relative;
+}
+.cell:last-child { border-right: none; }
+.cell:hover { background: var(--surface0); }
+.cell.open { background: var(--base); border-bottom-color: var(--sec); }
+.cell:focus-visible { outline: 2px solid var(--lavender); outline-offset: -2px; }
+.cell .glyph {
+  color: var(--sec);
+  font-weight: 700;
+  width: 12px;
+  text-align: center;
+}
+.cell .sum { display: inline-flex; align-items: baseline; gap: 0; }
+.cell .sum .r-sep { padding: 0 3px; }
+.cell .dim { color: var(--surface2); font-style: italic; font-family: inherit; }
+.cell .caret { color: var(--surface2); font-size: 10px; margin-left: 2px; }
+.cell.open .caret { color: var(--sec); }
+.cell.changed::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--staged);
+}
+
+/* The dropdown panel under the open cell. */
+#panel {
+  --sec: var(--muted);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 2px solid var(--sec);
+  margin-top: -1px;
+}
+#panel.none { border-top-color: transparent; }
+.p-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px 6px 10px;
+  background: var(--crust);
+  border-bottom: 1px solid var(--surface0);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.p-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.p-title b { color: var(--sec); font-weight: 600; }
+.p-title .n { color: var(--text); }
+.p-head .btn { padding: 3px 7px; font-size: 10.5px; }
+.p-head .btn:disabled { opacity: 0.3; }
+
+.p-list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+
+.hint {
+  padding: 22px 16px;
+  font-size: 12px;
+  color: var(--surface2);
+  text-align: center;
+  line-height: 1.5;
+}
+.hint b { color: var(--muted); font-weight: 600; }
+
+/* Rows */
+.row {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--surface0);
+  border-left: 3px solid transparent;
+  outline: none;
+  cursor: default;
+}
+.row-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px 5px 6px;
+  min-height: 30px;
+}
+.row:hover { background: #24243a; }
+.row.sel { background: #2c2a44; border-left-color: var(--sec); }
+.row:focus-visible { box-shadow: inset 0 0 0 2px var(--lavender); }
+.row.changed { border-left-color: var(--staged); }
+.row.changed .idx { color: var(--staged); }
+.row .idx {
+  flex-shrink: 0;
+  width: 18px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--surface2);
+  user-select: none;
+}
+.row .body {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.row .body .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .body .r-val { flex: 1; min-width: 0; }
+.row .body .r-key { flex-shrink: 0; max-width: 45%; }
+.row .body .r-eq { padding: 0 4px; flex-shrink: 0; }
+.row .body .bare { color: var(--surface2); font-size: 10px; margin-left: 6px; font-family: inherit; flex-shrink: 0; }
+.row.editing .body { overflow: visible; text-overflow: clip; }
+.row .body input {
+  flex: 1;
+  min-width: 40px;
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--crust);
+  border: 1px solid var(--sec);
+  border-radius: 3px;
+  outline: none;
+  color: var(--text);
+  padding: 1px 4px;
+}
+.row .body input.k { flex: 0 1 38%; min-width: 50px; }
+.row .badge {
+  flex-shrink: 0;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: var(--surface0);
+}
+.row .badge:hover, .row.expanded .badge { border-color: currentColor; }
+.row .acts { display: flex; gap: 1px; flex-shrink: 0; opacity: 0; transition: opacity 0.08s; }
+.row:hover .acts, .row.sel .acts, .row:focus-within .acts, .row:focus-visible .acts { opacity: 1; }
+.ico {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--mono);
+}
+.ico:hover { background: var(--surface1); color: var(--text); }
+.ico.del:hover { color: var(--red); }
+.ico:disabled { opacity: 0.25; cursor: default; }
+.ico:disabled:hover { background: transparent; color: var(--muted); }
+
+/* Peeled layers under an expanded row */
+.layers { padding: 0 8px 8px 27px; display: flex; flex-direction: column; gap: 5px; }
+.layer { background: var(--crust); border-radius: 4px; padding: 4px 6px 5px; border: 1px solid var(--surface0); }
+.layer-head { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.layer-label { font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--surface2); flex: 1; }
+.layer pre {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 120px;
+  overflow-y: auto;
+  user-select: text;
+}
+.layer.last pre { color: var(--text); }
+
+.row.phantom { background: #22283a; border-left-color: var(--sec); }
+.row.phantom .idx { color: var(--sec); }
+
+/* The URL this adds up to. */
+#raw {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 6px 10px;
+  background: var(--crust);
+  border-top: 1px solid var(--surface0);
+  border-left: 3px solid transparent;
+  flex-shrink: 0;
+}
+#raw.dirty { border-left-color: var(--staged); }
+.raw-label {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--surface2);
+  padding-top: 2px;
+  flex-shrink: 0;
+  width: 24px;
+}
+.raw-url {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  max-height: 30px;
+  overflow-y: auto;
+  user-select: text;
+}
+#raw .btn { padding: 2px 7px; font-size: 10px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="demo-bar">
+    <span class="demo-tag">demo url</span>
+    <button data-sample="short">short</button>
+    <button data-sample="typical" aria-pressed="true">typical</button>
+    <button data-sample="monster">monster</button>
+    <span class="spacer"></span>
+    <span>440 × 600</span>
+  </div>
+
+  <header>
+    <h1>Snatch URL</h1>
+    <span class="variant">D · Rail</span>
+  </header>
+
+  <div id="rail-wrap"><div id="rail" role="tablist" aria-label="URL sections"></div></div>
+
+  <div id="panel">
+    <div class="p-head" id="p-head"></div>
+    <div class="p-list" id="p-list"></div>
+  </div>
+
+  <div id="raw">
+    <span class="raw-label">url</span>
+    <span class="raw-url" id="raw-url"></span>
+    <button class="btn" id="copy-url">Copy URL</button>
+  </div>
+
+  <div class="keys">
+    <span><kbd>←→</kbd> section</span>
+    <span><kbd>↵/↓</kbd> open</span>
+    <span><kbd>↑↓</kbd> rows</span>
+    <span><kbd>↵</kbd> type over</span>
+    <span><kbd>space</kbd> pick</span>
+    <span><kbd>⇧↑↓</kbd> range</span>
+    <span><kbd>⌫</kbd> delete</span>
+    <span><kbd>⌘C</kbd> copy</span>
+    <span><kbd>esc</kbd> close</span>
+  </div>
+
+  <div class="status-bar" id="status-bar">
+    <span class="change-summary" id="change-summary" role="status">No unapplied changes</span>
+    <button class="btn" id="revert-btn" disabled>Revert</button>
+    <button class="btn" id="new-btn" disabled>New tab</button>
+    <button class="btn btn-primary" id="apply-btn" disabled>Apply</button>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+</div>
+
+<script type="module">
+import {
+  SAMPLES, tokenize, groupRange, encodeFor, spliceRaw, peel, badgeFor, countChanges,
+} from './proto-core.js';
+
+const $ = id => document.getElementById(id);
+
+const GROUPS = ['origin', 'path', 'query', 'hash'];
+const META = {
+  origin: { glyph: '⌂', name: 'host', color: 'var(--mauve)', unit: 'part' },
+  path:   { glyph: '/', name: 'path', color: 'var(--peach)', unit: 'segment' },
+  query:  { glyph: '?', name: 'query', color: 'var(--blue)', unit: 'param' },
+  hash:   { glyph: '#', name: 'fragment', color: 'var(--teal)', unit: 'fragment' },
+};
+
+// --- state -------------------------------------------------------------
+
+let baseText = '';
+let baseTok = null;
+let text = '';
+let tok = null;
+let open = null;              // the section whose dropdown is showing
+let selection = new Set();    // row keys inside the open section
+let anchor = null;            // row key, for shift-range
+let expanded = new Set();     // row keys showing their peeled layers
+let adding = false;           // a phantom "new part" row is live in the open section
+let focusAfter = null;        // { cell } | { row } - where focus goes after the next render
+
+function load(url) {
+  const r = tokenize(url);
+  baseTok = tok = r;
+  baseText = text = r.text;
+  selection = new Set(); anchor = null; expanded = new Set(); adding = false;
+  open = tok.model.entries.length ? 'query' : 'path';
+}
+
+// --- rows: what a section is made of ----------------------------------
+//
+// A row is one thing the user can select, copy, type over or delete. In
+// the query it is a whole parameter (name and value together) - which is
+// what the change counter counts too.
+
+function rowsOf(group) {
+  const T = tok.tokens;
+  const one = role => T.find(t => t.role === role);
+  if (group === 'origin') {
+    const out = [];
+    const ui = one('userinfo');
+    if (ui) out.push({ key: 'userinfo', role: 'userinfo', main: ui, text: ui.raw.slice(0, -1), raw: ui.raw.slice(0, -1), label: 'user info' });
+    const h = one('host');
+    out.push({ key: 'host', role: 'host', main: h, text: h.text, raw: h.raw, label: 'host' });
+    const p = one('port');
+    if (p) out.push({ key: 'port', role: 'port', main: p, text: p.raw.slice(1), raw: p.raw.slice(1), label: 'port' });
+    return out;
+  }
+  if (group === 'path') {
+    return T.filter(t => t.role === 'seg').map(t => ({
+      key: `seg-${t.index}`, role: 'seg', main: t, text: t.text, raw: t.raw, label: `segment ${t.index + 1}`,
+    }));
+  }
+  if (group === 'query') {
+    const out = [];
+    for (const k of T.filter(t => t.role === 'key')) {
+      const v = T.find(t => t.role === 'val' && t.index === k.index) || null;
+      out.push({
+        key: `param-${k.index}`, role: 'param', k, v, main: v || k,
+        text: v ? `${k.text}=${v.text}` : k.text,
+        raw: v ? `${k.raw}=${v.raw}` : k.raw,
+        label: `parameter ${k.index + 1}`,
+      });
+    }
+    return out;
+  }
+  const h = one('hash');
+  return h ? [{ key: 'hash', role: 'hash', main: h, text: h.text, raw: h.raw.slice(1), label: 'fragment' }] : [];
+}
+
+const rowByKey = key => rowsOf(open).find(r => r.key === key) || null;
+
+/** A row's raw text as the URL has it, for the multiset diff against the base. */
+function rowSig(row) {
+  return `${row.role}\u0000${row.raw}`;
+}
+
+/**
+ * Which rows differ from the tab's URL. A delete shifts every later index,
+ * so this compares rows as a multiset of (role, raw) rather than by index:
+ * a row is changed when the base has no unconsumed row that reads the same.
+ */
+function changedKeys(group) {
+  const saved = tok;
+  tok = baseTok;
+  const bag = new Map();
+  for (const r of rowsOf(group)) bag.set(rowSig(r), (bag.get(rowSig(r)) || 0) + 1);
+  tok = saved;
+  const out = new Set();
+  for (const r of rowsOf(group)) {
+    const n = bag.get(rowSig(r)) || 0;
+    if (n > 0) bag.set(rowSig(r), n - 1); else out.add(r.key);
+  }
+  return out;
+}
+
+function sectionRaw(t, group) {
+  const g = groupRange(t.tokens, group);
+  return g ? t.text.slice(g.start, g.end) : '';
+}
+
+// --- render ------------------------------------------------------------
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+function cellSummary(group) {
+  const T = tok.tokens;
+  if (group === 'origin') {
+    return T.filter(t => t.group === 'origin' && t.role !== 'scheme')
+      .map(t => `<span class="r-${t.role} t">${esc(t.raw)}</span>`).join('');
+  }
+  if (group === 'path') {
+    const segs = T.filter(t => t.role === 'seg');
+    if (!segs.length) return '<span class="dim">root</span>';
+    return segs.map(t => `<span class="r-seg">${esc(t.text)}</span>`).join('<span class="r-sep">/</span>');
+  }
+  if (group === 'query') {
+    const n = tok.model.entries.length;
+    return n ? `<span class="r-key">${n} param${n === 1 ? '' : 's'}</span>` : '<span class="dim">none</span>';
+  }
+  const h = T.find(t => t.role === 'hash');
+  return h ? `<span class="r-hash">${esc(h.text)}</span>` : '<span class="dim">none</span>';
+}
+
+function railEdges() {
+  const r = $('rail');
+  $('rail-wrap').classList.toggle('more-left', r.scrollLeft > 2);
+  $('rail-wrap').classList.toggle('more-right', r.scrollLeft + r.clientWidth < r.scrollWidth - 2);
+}
+
+function renderRail() {
+  $('rail').innerHTML = GROUPS.map(g => {
+    const changed = sectionRaw(baseTok, g) !== sectionRaw(tok, g);
+    return `<button class="cell${open === g ? ' open' : ''}${changed ? ' changed' : ''}"
+      data-group="${g}" role="tab" aria-selected="${open === g}" style="--sec:${META[g].color}"
+      title="${META[g].name}${changed ? ' - changed, unapplied' : ''}">
+      <span class="glyph">${META[g].glyph}</span>
+      <span class="sum">${cellSummary(g)}</span>
+      <span class="caret">▾</span>
+    </button>`;
+  }).join('');
+  const cur = $('rail').querySelector('.cell.open');
+  if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  railEdges();
+}
+
+function rowHtml(row, i, changed) {
+  const editable = row.role === 'param' ? (row.v ? row.v.raw : null)
+    : row.role === 'seg' || row.role === 'hash' ? row.raw : null;
+  const badge = editable === null ? null : badgeFor(editable);
+  const sel = selection.has(row.key);
+  const isOpen = expanded.has(row.key);
+  let body;
+  if (row.role === 'param') {
+    body = `<span class="r-key t" data-field="key">${esc(row.k.text)}</span>`
+      + (row.v ? `<span class="r-eq">=</span><span class="r-val t" data-field="val">${esc(row.v.text)}</span>`
+        : '<span class="bare">no value</span>');
+  } else {
+    body = `<span class="r-${row.role} t" data-field="text">${esc(row.text)}</span>`;
+  }
+  const layers = isOpen && editable !== null ? peel(editable) : [];
+  return `<div class="row${sel ? ' sel' : ''}${changed ? ' changed' : ''}${isOpen ? ' expanded' : ''}"
+      data-key="${row.key}" tabindex="${i === 0 ? 0 : -1}" role="option" aria-selected="${sel}"
+      aria-label="${esc(row.label)}: ${esc(row.text)}">
+    <div class="row-line">
+      <span class="idx">${row.role === 'seg' || row.role === 'param' ? i + 1 : META[open].glyph}</span>
+      <span class="body">${body}</span>
+      ${badge ? `<button class="badge ${badge}" data-act="peel" title="${isOpen ? 'Hide' : 'Show'} what this really says">${badge === 'encoded' ? '%' : badge}</button>` : ''}
+      <span class="acts">
+        <button class="ico" data-act="copy" title="Copy as written in the URL">⧉</button>
+        <button class="ico" data-act="edit" title="Type over (Enter)">✎</button>
+        <button class="ico del" data-act="del" title="Delete (⌫)"${row.role === 'host' ? ' disabled' : ''}>×</button>
+      </span>
+    </div>
+    ${layers.length ? `<div class="layers">${layers.map((l, li) => `
+      <div class="layer${li === layers.length - 1 ? ' last' : ''}">
+        <div class="layer-head"><span class="layer-label">${l.label}${l.isUrl ? ' · nested url' : ''}</span>
+          <button class="ico" data-act="copy-layer" data-layer="${li}" title="Copy this form">⧉</button></div>
+        <pre>${esc(l.text)}</pre>
+      </div>`).join('')}</div>` : ''}
+  </div>`;
+}
+
+function phantomHtml() {
+  const g = open;
+  const inputs = g === 'query'
+    ? '<input class="k" data-new="key" placeholder="name" aria-label="New parameter name" spellcheck="false">'
+      + '<span class="r-eq">=</span><input data-new="val" placeholder="value" aria-label="New parameter value" spellcheck="false">'
+    : `<input data-new="text" placeholder="${g === 'origin' ? 'port' : g === 'path' ? 'segment' : 'fragment'}"
+        aria-label="New ${META[g].unit}" spellcheck="false"${g === 'origin' ? ' inputmode="numeric"' : ''}>`;
+  return `<div class="row phantom editing" data-phantom="1">
+    <div class="row-line"><span class="idx">+</span><span class="body">${inputs}</span>
+    <span class="acts"><button class="ico" data-act="add-ok" title="Add (Enter)">↵</button>
+    <button class="ico del" data-act="add-cancel" title="Cancel (Esc)">×</button></span></div></div>`;
+}
+
+function renderPanel() {
+  const panel = $('panel');
+  const head = $('p-head');
+  const list = $('p-list');
+  panel.classList.toggle('none', !open);
+  if (!open) {
+    panel.style.setProperty('--sec', 'var(--muted)');
+    head.innerHTML = '<span class="p-title">Pick a section on the rail</span>';
+    list.innerHTML = '<div class="hint">Every part of the URL is on the rail above.<br>'
+      + 'Click one - or press <b>↓</b> - to see what is in it.</div>';
+    return;
+  }
+  panel.style.setProperty('--sec', META[open].color);
+  const rows = rowsOf(open);
+  const changed = changedKeys(open);
+  const nSel = [...selection].filter(k => rows.some(r => r.key === k)).length;
+  const allSel = rows.length > 0 && nSel === rows.length;
+  const canAdd = open === 'path' || open === 'query'
+    || (open === 'hash' && rows.length === 0)
+    || (open === 'origin' && !rows.some(r => r.key === 'port'));
+  const canClear = open !== 'origin' && rows.length > 0;
+
+  head.innerHTML = `<span class="p-title">${nSel
+    ? `<b>${nSel} selected</b> of ${rows.length}`
+    : `<b>${META[open].name}</b> · <span class="n">${rows.length}</span> ${META[open].unit}${rows.length === 1 ? '' : 's'}`}</span>
+    <button class="btn" data-hact="copy" title="${nSel ? 'Copy the selected parts' : 'Copy the whole section as it appears in the URL'}"${rows.length ? '' : ' disabled'}>Copy</button>
+    <button class="btn" data-hact="${allSel ? 'none' : 'all'}" title="${allSel ? 'Select none' : 'Select all'}"${rows.length ? '' : ' disabled'}>${allSel ? 'None' : 'All'}</button>
+    <button class="btn" data-hact="add" title="${open === 'origin' ? 'Add a port' : 'Add a ' + META[open].unit}"${canAdd ? '' : ' disabled'}>+ Add</button>
+    <button class="btn btn-danger" data-hact="${nSel ? 'del' : 'clear'}" title="${nSel ? 'Delete the selected parts' : 'Remove the whole section'}"${(nSel || canClear) ? '' : ' disabled'}>${nSel ? `Delete ${nSel}` : 'Clear'}</button>`;
+
+  let html = rows.map((r, i) => rowHtml(r, i, changed.has(r.key))).join('');
+  if (adding) html += phantomHtml();
+  if (!rows.length && !adding) {
+    html = `<div class="hint">${open === 'path' ? 'Root path - no segments.'
+      : open === 'query' ? 'No query string.' : 'No fragment.'}<br><b>+ Add</b> puts one in.</div>`;
+  }
+  list.innerHTML = html;
+}
+
+function renderRaw() {
+  $('raw-url').innerHTML = tok.tokens.map(t => `<span class="r-${t.role}">${esc(t.raw)}</span>`).join('');
+  $('raw').classList.toggle('dirty', text !== baseText);
+}
+
+function renderChrome() {
+  const dirty = text !== baseText;
+  const n = dirty ? countChanges(baseText, text, baseTok.tokens, tok.tokens) : 0;
+  $('change-summary').textContent = dirty
+    ? `${n} unapplied change${n === 1 ? '' : 's'}` : 'No unapplied changes';
+  $('status-bar').classList.toggle('dirty', dirty);
+  for (const id of ['apply-btn', 'new-btn', 'revert-btn']) $(id).disabled = !dirty;
+}
+
+function render() {
+  renderRail();
+  renderPanel();
+  renderRaw();
+  renderChrome();
+  if (focusAfter) {
+    const want = focusAfter; focusAfter = null;
+    if (want.cell) focusCell(want.cell);
+    else if (want.row) focusRow(want.row);
+    else if (want.phantom) {
+      const inp = $('p-list').querySelector('[data-phantom] input');
+      if (inp) inp.focus();
+    }
+  }
+}
+
+function focusCell(group) {
+  const el = $('rail').querySelector(`.cell[data-group="${group}"]`);
+  if (!el) return;
+  el.focus({ preventScroll: true });
+  el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+function focusRow(key) {
+  const rows = [...$('p-list').querySelectorAll('.row[data-key]')];
+  const el = rows.find(r => r.dataset.key === key) || rows[0];
+  if (!el) return;
+  for (const r of rows) r.tabIndex = r === el ? 0 : -1;
+  el.focus({ preventScroll: true });
+  el.scrollIntoView({ block: 'nearest' });
+}
+
+// --- edits: every one is a splice into the URL string -----------------
+
+/** `focus` may be a function, so it can pick a row that only exists after the edit. */
+function commit(next, focus) {
+  const r = tokenize(next);
+  if (!r.ok) { flash(r.error, true); return false; }
+  tok = r;
+  text = r.text;
+  if (focus) focusAfter = typeof focus === 'function' ? focus() : focus;
+  render();
+  return true;
+}
+
+/** Deleting a part takes its punctuation with it, so the URL stays a URL. */
+function rangeToDelete(row) {
+  const T = tok.tokens;
+  if (row.role === 'seg') {
+    const i = T.indexOf(row.main);
+    const from = T[i - 1] && T[i - 1].role === 'sep' ? T[i - 1].start : row.main.start;
+    return [from, row.main.end];
+  }
+  if (row.role === 'param') {
+    const first = row.k, last = row.v || row.k;
+    let from = first.start, to = last.end;
+    const before = T[T.indexOf(first) - 1];
+    const after = T[T.indexOf(last) + 1];
+    if (before && before.role === 'amp') from = before.start;
+    else if (after && after.role === 'amp') to = after.end;
+    else if (before && before.role === 'qmark') from = before.start;
+    return [from, to];
+  }
+  if (row.role === 'host') return null;
+  return [row.main.start, row.main.end];
+}
+
+function deleteRows(rows) {
+  const ranges = rows.map(rangeToDelete).filter(Boolean).sort((a, b) => a[0] - b[0]);
+  if (!ranges.length) { flash('A URL needs its host.', true); return; }
+  const merged = [];
+  for (const r of ranges) {
+    const last = merged.at(-1);
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+    else merged.push([...r]);
+  }
+  let next = text;
+  for (const [from, to] of [...merged].reverse()) next = spliceRaw(next, from, to, '');
+  selection = new Set(); anchor = null;
+  const n = rows.length;
+  // Focus lands on the row that slid into the gap, so delete-delete-delete flows.
+  const at = rowsOf(open).findIndex(r => r.key === rows[0].key);
+  const landing = () => {
+    const left = rowsOf(open);
+    return left.length ? { row: left[Math.min(Math.max(at, 0), left.length - 1)].key } : { cell: open };
+  };
+  if (commit(next, landing)) flash(`Deleted ${n} ${META[open].unit}${n === 1 ? '' : 's'}.`);
+}
+
+function clearSection() {
+  const g = groupRange(tok.tokens, open);
+  if (!g) return;
+  const next = spliceRaw(text, g.start, g.end, open === 'path' ? '/' : '');
+  selection = new Set(); anchor = null;
+  if (commit(next, { cell: open })) flash(`Cleared the ${META[open].name}.`);
+}
+
+/** Type over one field of a row: `{ ok, text }` or `{ ok: false, error }`. */
+function retyped(row, field, value) {
+  const ok = t => ({ ok: true, text: t });
+  const err = error => ({ ok: false, error });
+  const splice = (t, raw) => ok(spliceRaw(text, t.start, t.end, raw));
+  if (field === 'key') {
+    return value === '' ? err('Key cannot be empty.') : splice(row.k, encodeFor('key', value));
+  }
+  if (field === 'val') return splice(row.v, encodeFor('val', value));
+  const t = row.main;
+  switch (row.role) {
+    case 'seg':
+      return value === '' ? err('Segment cannot be empty.') : splice(t, encodeFor('seg', value));
+    case 'port':
+      if (value === '') return splice(t, '');
+      return /^\d{1,5}$/.test(value) ? splice(t, ':' + value) : err('A port is a number.');
+    case 'hash':
+      return splice(t, value === '' ? '' : encodeFor('hash', value));
+    case 'host':
+      return value === '' ? err('A URL needs its host.') : splice(t, value);
+    case 'userinfo':
+      return splice(t, value === '' ? '' : value + '@');
+    default:
+      return ok(text);
+  }
+}
+
+function startEdit(key, field) {
+  const row = rowByKey(key);
+  if (!row) return;
+  const el = $('p-list').querySelector(`.row[data-key="${key}"]`);
+  if (!el || el.querySelector('input')) return;
+  if (row.role === 'param' && field !== 'key' && !row.v) field = 'key';
+  const target = el.querySelector(`[data-field="${field}"]`);
+  if (!target) return;
+
+  const current = field === 'key' ? row.k.text : field === 'val' ? row.v.text : row.text;
+  const input = document.createElement('input');
+  input.value = current;
+  input.spellcheck = false;
+  input.setAttribute('aria-label', `Type over ${row.label}`);
+  if (field === 'key') input.className = 'k';
+  target.replaceWith(input);
+  el.classList.add('editing');
+  input.focus();
+  input.select();                     // type-over: the whole piece is armed
+
+  // Enter commits and re-renders, which removes the input and fires blur; the
+  // guard keeps that second call from re-running the edit.
+  let done = false;
+  const finish = ok => {
+    if (done) return;
+    done = true;
+    focusAfter = { row: key };
+    if (!ok || input.value === current) { render(); return; }
+    const live = rowByKey(key);
+    if (!live) { render(); return; }
+    const r = retyped(live, field, input.value);
+    if (!r.ok) { flash(r.error, true); render(); return; }
+    if (r.text === text || !commit(r.text)) render();
+  };
+  input.addEventListener('blur', () => finish(true));
+  input.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    else if (e.key === 'Tab' && row.role === 'param' && field === 'key' && row.v) {
+      e.preventDefault(); finish(true);
+      startEdit(key, 'val');
+    }
+  });
+}
+
+// --- adding: a phantom row that only touches the URL when it commits ---
+
+function startAdd() {
+  adding = true;
+  selection = new Set();
+  focusAfter = { phantom: true };
+  render();
+}
+
+function commitAdd() {
+  const box = $('p-list').querySelector('[data-phantom]');
+  if (!box) return;
+  const val = name => { const i = box.querySelector(`[data-new="${name}"]`); return i ? i.value : ''; };
+  let next = text;
+  let focus = null;
+  if (open === 'path') {
+    const v = val('text');
+    if (v === '') { cancelAdd(); return; }
+    const g = groupRange(tok.tokens, 'path');
+    const piece = encodeFor('seg', v);
+    const n = tok.model.segments.length;
+    next = spliceRaw(text, g.end, g.end, (n === 0 || tok.model.trailingSlash) ? piece : '/' + piece);
+    focus = { row: `seg-${n}` };
+  } else if (open === 'query') {
+    const k = val('key'), v = val('val');
+    if (k === '') { if (v === '') { cancelAdd(); return; } flash('Key cannot be empty.', true); return; }
+    const piece = encodeFor('key', k) + (v === '' ? '' : '=' + encodeFor('val', v));
+    const q = groupRange(tok.tokens, 'query');
+    const n = tok.model.entries.length;
+    next = q ? spliceRaw(text, q.end, q.end, '&' + piece)
+      : spliceRaw(text, groupRange(tok.tokens, 'path').end, groupRange(tok.tokens, 'path').end, '?' + piece);
+    focus = { row: `param-${n}` };
+  } else if (open === 'hash') {
+    const v = val('text');
+    if (v === '') { cancelAdd(); return; }
+    next = text + encodeFor('hash', v);
+    focus = { row: 'hash' };
+  } else {
+    const v = val('text');
+    if (v === '') { cancelAdd(); return; }
+    if (!/^\d{1,5}$/.test(v)) { flash('A port is a number.', true); return; }
+    const h = tok.tokens.find(t => t.role === 'host');
+    next = spliceRaw(text, h.end, h.end, ':' + v);
+    focus = { row: 'port' };
+  }
+  adding = false;
+  if (!commit(next, focus)) { adding = true; render(); }
+}
+
+function cancelAdd() {
+  adding = false;
+  focusAfter = { cell: open };
+  render();
+}
+
+// --- selection ---------------------------------------------------------
+
+function pick(key, e) {
+  const keys = rowsOf(open).map(r => r.key);
+  if (e && (e.metaKey || e.ctrlKey)) {
+    selection.has(key) ? selection.delete(key) : selection.add(key);
+    anchor = key;
+  } else if (e && e.shiftKey && anchor && keys.includes(anchor)) {
+    const a = keys.indexOf(anchor), b = keys.indexOf(key);
+    selection = new Set(keys.slice(Math.min(a, b), Math.max(a, b) + 1));
+  } else {
+    selection = new Set([key]);
+    anchor = key;
+  }
+  focusAfter = { row: key };
+  render();
+}
+
+function selectedRows() {
+  return rowsOf(open).filter(r => selection.has(r.key));
+}
+
+// --- copy --------------------------------------------------------------
+
+function copyRows(rows) {
+  if (!rows.length) return;
+  const joiner = open === 'path' ? '/' : open === 'query' ? '&' : '\n';
+  copy(rows.map(r => r.raw).join(joiner));
+}
+
+function copySection() {
+  const s = sectionRaw(tok, open);
+  if (s) copy(s); else flash(`This URL has no ${META[open].name}.`, true);
+}
+
+// --- opening a section -------------------------------------------------
+
+function openSection(group, focus) {
+  if (open !== group) { selection = new Set(); anchor = null; adding = false; }
+  open = group;
+  focusAfter = focus || { cell: group };
+  render();
+}
+
+function closePanel() {
+  const was = open;
+  open = null; selection = new Set(); anchor = null; adding = false;
+  focusAfter = { cell: was || 'origin' };
+  render();
+}
+
+// --- events: rail ------------------------------------------------------
+
+$('rail').addEventListener('scroll', railEdges);
+
+$('rail').addEventListener('click', e => {
+  const cell = e.target.closest('.cell');
+  if (!cell) return;
+  const g = cell.dataset.group;
+  if (open === g) closePanel(); else openSection(g);
+});
+
+// --- events: panel -----------------------------------------------------
+
+$('p-head').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-hact]');
+  if (!btn || btn.disabled) return;
+  const act = btn.dataset.hact;
+  const sel = selectedRows();
+  if (act === 'copy') sel.length ? copyRows(sel) : copySection();
+  else if (act === 'all') { selection = new Set(rowsOf(open).map(r => r.key)); render(); }
+  else if (act === 'none') { selection = new Set(); render(); }
+  else if (act === 'add') startAdd();
+  else if (act === 'del') deleteRows(sel);
+  else if (act === 'clear') clearSection();
+});
+
+$('p-list').addEventListener('click', e => {
+  const act = e.target.closest('button[data-act]');
+  const phantom = e.target.closest('[data-phantom]');
+  if (phantom) {
+    if (act && act.dataset.act === 'add-ok') commitAdd();
+    else if (act && act.dataset.act === 'add-cancel') cancelAdd();
+    return;
+  }
+  const el = e.target.closest('.row[data-key]');
+  if (!el) return;
+  const key = el.dataset.key;
+  if (act) {
+    const row = rowByKey(key);
+    const a = act.dataset.act;
+    if (a === 'copy') copyRows([row]);
+    else if (a === 'edit') startEdit(key, row.role === 'param' ? 'val' : 'text');
+    else if (a === 'del') deleteRows([row]);
+    else if (a === 'peel') { expanded.has(key) ? expanded.delete(key) : expanded.add(key); focusAfter = { row: key }; render(); }
+    else if (a === 'copy-layer') {
+      const editable = row.role === 'param' ? row.v.raw : row.raw;
+      copy(peel(editable)[+act.dataset.layer].text);
+    }
+    return;
+  }
+  if (e.target.tagName === 'INPUT' || e.target.closest('.layers')) return;
+  pick(key, e);
+});
+
+$('p-list').addEventListener('dblclick', e => {
+  const el = e.target.closest('.row[data-key]');
+  if (!el || e.target.tagName === 'INPUT' || e.target.closest('.layers')) return;
+  const field = e.target.closest('[data-field]');
+  const row = rowByKey(el.dataset.key);
+  startEdit(el.dataset.key, field ? field.dataset.field : row.role === 'param' ? 'val' : 'text');
+});
+
+$('p-list').addEventListener('keydown', e => {
+  const inp = e.target.closest('[data-phantom] input');
+  if (!inp) return;
+  e.stopPropagation();
+  if (e.key === 'Enter') { e.preventDefault(); commitAdd(); }
+  else if (e.key === 'Escape') { e.preventDefault(); cancelAdd(); }
+  else if (e.key === 'Tab' && inp.dataset.new === 'key' && !e.shiftKey) {
+    e.preventDefault();
+    const v = $('p-list').querySelector('[data-new="val"]');
+    if (v) v.focus();
+  }
+});
+
+// --- events: keyboard --------------------------------------------------
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key === 'Enter') { e.preventDefault(); apply(); return; }
+
+  const cell = e.target.closest ? e.target.closest('.cell') : null;
+  const rowEl = e.target.closest ? e.target.closest('.row[data-key]') : null;
+  const at = GROUPS.indexOf(open);
+
+  const step = dir => {
+    const from = cell ? GROUPS.indexOf(cell.dataset.group) : at;
+    const g = GROUPS[Math.max(0, Math.min(GROUPS.length - 1, (from === -1 ? 0 : from) + dir))];
+    if (open) openSection(g); else { focusAfter = { cell: g }; render(); }
+  };
+
+  if (cell) {
+    const g = cell.dataset.group;
+    if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+    else if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      const first = rowsOf(g)[0];
+      openSection(g, first ? { row: first.key } : { cell: g });
+    } else if (e.key === 'Escape') { e.preventDefault(); if (open) closePanel(); }
+    return;
+  }
+
+  if (rowEl) {
+    const rows = [...$('p-list').querySelectorAll('.row[data-key]')];
+    const i = rows.indexOf(rowEl);
+    const key = rowEl.dataset.key;
+    const move = to => {
+      const next = rows[to];
+      if (!next) { if (to < 0) focusCell(open); return; }
+      if (e.shiftKey) pick(next.dataset.key, { shiftKey: true });
+      else focusRow(next.dataset.key);
+    };
+    if (e.key === 'ArrowDown') { e.preventDefault(); move(i + 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); move(i - 1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+    else if (e.key === 'Home') { e.preventDefault(); move(0); }
+    else if (e.key === 'End') { e.preventDefault(); move(rows.length - 1); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      const row = rowByKey(key);
+      startEdit(key, row.role === 'param' ? 'val' : 'text');
+    } else if (e.key === ' ') { e.preventDefault(); pick(key, { metaKey: true }); }
+    else if (e.key === 'Backspace' || e.key === 'Delete') {
+      e.preventDefault();
+      const sel = selectedRows();
+      deleteRows(sel.length ? sel : [rowByKey(key)]);
+    } else if (mod && e.key === 'c') {
+      e.preventDefault();
+      const sel = selectedRows();
+      copyRows(sel.length ? sel : [rowByKey(key)]);
+    } else if (mod && e.key === 'a') {
+      e.preventDefault();
+      selection = new Set(rowsOf(open).map(r => r.key));
+      focusAfter = { row: key }; render();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      if (selection.size) { selection = new Set(); focusAfter = { row: key }; render(); }
+      else closePanel();
+    } else if (e.key === 'Tab' && !e.shiftKey && i < rows.length - 1) {
+      // Tab walks the rows too, so a keyboard user is never trapped on one.
+      e.preventDefault(); focusRow(rows[i + 1].dataset.key);
+    }
+    return;
+  }
+
+  if (e.key === 'Escape' && open) { closePanel(); }
+});
+
+// --- chrome ------------------------------------------------------------
+
+function copy(s) {
+  navigator.clipboard.writeText(s).then(
+    () => flash('Copied: ' + (s.length > 38 ? s.slice(0, 38) + '…' : s)),
+    () => flash('Clipboard blocked in this frame.', true));
+}
+
+let toastTimer = null;
+function flash(msg, bad) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.toggle('err', !!bad);
+  el.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 2200);
+}
+
+function apply() {
+  if (text === baseText) return;
+  baseText = text; baseTok = tok;
+  render();
+  flash('Applied - the tab would navigate here.');
+}
+
+$('copy-url').onclick = () => copy(text);
+$('apply-btn').onclick = apply;
+$('new-btn').onclick = () => flash('Would open a new tab at the edited URL.');
+$('revert-btn').onclick = () => {
+  text = baseText; tok = baseTok;
+  selection = new Set(); anchor = null; adding = false;
+  render();
+};
+
+for (const btn of document.querySelectorAll('[data-sample]')) {
+  btn.onclick = () => {
+    for (const b of document.querySelectorAll('[data-sample]')) b.setAttribute('aria-pressed', 'false');
+    btn.setAttribute('aria-pressed', 'true');
+    load(SAMPLES[btn.dataset.sample]);
+    render();
+  };
+}
+
+load(SAMPLES.typical);
+render();
+</script>
+</body>
+</html>

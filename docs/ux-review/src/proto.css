@@ -1,0 +1,201 @@
+/* Shared chrome for the three prototypes.
+   Catppuccin Mocha, same stack as the shipped popup (styles.css), so the
+   comparison is about the editing surface and not about the paint. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --base: #1e1e2e;
+  --mantle: #181825;
+  --crust: #11111b;
+  --surface0: #313244;
+  --surface1: #45475a;
+  --surface2: #585b70;
+  --text: #cdd6f4;
+  --muted: #a6adc8;
+  --mauve: #cba6f7;
+  --blue: #89b4fa;
+  --green: #a6e3a1;
+  --peach: #fab387;
+  --yellow: #f9e2af;
+  --red: #f38ba8;
+  --teal: #94e2d5;
+  --lavender: #b4befe;
+  --pink: #f5c2e7;
+  --staged: #f9e2af;
+  --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+/* One colour per role, identical in all three prototypes. */
+.r-scheme, .r-sep, .r-qmark, .r-eq, .r-amp { color: var(--surface2); }
+.r-host { color: var(--mauve); }
+.r-userinfo { color: var(--pink); }
+.r-port { color: var(--pink); }
+.r-seg { color: var(--peach); }
+.r-key { color: var(--blue); }
+.r-val { color: var(--green); }
+.r-hash { color: var(--teal); }
+
+html, body { height: 100%; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  background: var(--base);
+  color: var(--text);
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* --- Demo scaffolding (NOT part of any design) --- */
+.demo-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--crust);
+  border-bottom: 1px dashed var(--surface1);
+  font-size: 10px;
+  color: var(--surface2);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.demo-bar .demo-tag { color: var(--surface2); margin-right: 2px; }
+.demo-bar button {
+  background: transparent;
+  border: 1px solid var(--surface0);
+  border-radius: 999px;
+  color: var(--muted);
+  font: inherit;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.demo-bar button[aria-pressed="true"] { background: var(--surface0); color: var(--text); border-color: var(--surface1); }
+.demo-bar .spacer { flex: 1; }
+
+/* --- Header --- */
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 9px 12px 7px;
+  background: var(--mantle);
+  border-bottom: 1px solid var(--surface0);
+  flex-shrink: 0;
+}
+header h1 {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mauve);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+header .variant {
+  font-size: 11px;
+  color: var(--muted);
+  flex: 1;
+  text-align: right;
+}
+
+/* --- Shared bottom bars --- */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--surface0);
+  background: var(--mantle);
+  flex-shrink: 0;
+}
+.change-summary { flex: 1; font-size: 11px; color: var(--muted); min-width: 0; }
+.status-bar.dirty .change-summary { color: var(--staged); font-weight: 600; }
+
+.btn {
+  background: var(--surface0);
+  border: 1px solid var(--surface1);
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  padding: 4px 9px;
+  white-space: nowrap;
+  transition: background 0.1s, border-color 0.1s;
+}
+.btn:hover { background: var(--surface1); }
+.btn-primary { background: var(--mauve); border-color: var(--mauve); color: var(--base); font-weight: 600; }
+.btn-primary:hover { background: var(--lavender); border-color: var(--lavender); }
+.btn-danger { color: var(--red); }
+.btn-danger:hover { background: #3d2a2e; border-color: var(--red); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+.btn:disabled:hover { background: var(--surface0); }
+.btn-primary:disabled:hover { background: var(--mauve); }
+
+.toast {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 46px;
+  padding: 7px 10px;
+  border-radius: 5px;
+  background: #2a3d2e;
+  color: var(--green);
+  border: 1px solid var(--green);
+  font-size: 12px;
+  z-index: 40;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+.toast.err { background: #3d2a2e; color: var(--red); border-color: var(--red); }
+.hidden { display: none !important; }
+
+:focus-visible { outline: 2px solid var(--mauve); outline-offset: 1px; }
+
+/* Thin scrollbars everywhere. */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface1); border-radius: 3px; }
+
+/* --- Keyboard hint strip --- */
+.keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 5px 12px;
+  background: var(--crust);
+  border-top: 1px solid var(--surface0);
+  font-size: 10px;
+  color: var(--surface2);
+  flex-shrink: 0;
+}
+.keys kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--surface0);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+/* --- Badges --- */
+.badge {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 3px;
+  padding: 1px 4px;
+  background: var(--surface0);
+  color: var(--muted);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  vertical-align: 1px;
+}
+.badge.encoded { color: var(--yellow); }
+.badge.url { color: var(--teal); }
+.badge.base64, .badge.jwt { color: var(--pink); }
+.badge.json { color: var(--lavender); }

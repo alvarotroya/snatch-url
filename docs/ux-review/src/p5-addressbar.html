@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Snatch URL · E · Second Address Bar</title>
+<link rel="stylesheet" href="proto.css">
+<style>
+/* --- E: a wide popup that reads as a second address bar -------------- */
+/* A Chrome popup may be up to 800 x 600. Anchored under the toolbar icon,
+   800px wide and only a couple of hundred tall, it lands directly beneath
+   the real address bar and reads as a second one. */
+
+body { background: #0b0b12; }
+
+#browser {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: var(--crust);
+  overflow: hidden;
+}
+
+/* --- the fake browser around it --- */
+.tabstrip {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 6px 10px 0;
+  background: #0d0d15;
+}
+.tab {
+  font-size: 11px;
+  color: var(--surface2);
+  background: #15151f;
+  border-radius: 7px 7px 0 0;
+  padding: 5px 12px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tab.on { background: var(--mantle); color: var(--muted); }
+
+.omnibar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--mantle);
+  border-bottom: 1px solid #0d0d15;
+}
+.omni-nav { color: var(--surface2); font-size: 12px; letter-spacing: 2px; }
+.omni-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #0d0d15;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--surface2);
+}
+.omni-field .u { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ext-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--mauve);
+  color: var(--base);
+  font-size: 12px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 0 3px rgba(203, 166, 247, 0.22);
+}
+
+/* the page behind, deliberately mute */
+#page { padding: 20px 22px; opacity: 0.35; }
+#page .blk { background: var(--surface0); border-radius: 4px; margin-bottom: 9px; }
+
+/* --- THE POPUP: the prototype itself --- */
+#popup {
+  position: absolute;
+  top: 62px;
+  right: 8px;
+  width: 800px;
+  max-width: calc(100% - 16px);
+  background: var(--base);
+  border: 1px solid var(--surface1);
+  border-radius: 10px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100% - 74px);
+}
+#popup::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  right: 14px;
+  width: 10px;
+  height: 10px;
+  background: var(--base);
+  border-left: 1px solid var(--surface1);
+  border-top: 1px solid var(--surface1);
+  transform: rotate(45deg);
+}
+
+.pop-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px 6px;
+  border-bottom: 1px solid var(--surface0);
+  background: var(--mantle);
+}
+.pop-head h1 {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--mauve);
+}
+.pop-head .variant { font-size: 10.5px; color: var(--surface2); flex: 1; }
+
+/* --- the bar --- */
+.bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 12px;
+}
+.bar-lock { color: var(--surface2); font-size: 12px; padding-top: 3px; }
+
+#url-line {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.75;
+  background: var(--crust);
+  border: 1px solid var(--surface0);
+  border-radius: 8px;
+  padding: 5px 10px;
+  overflow-wrap: anywhere;
+  max-height: 72px;
+  overflow-y: auto;
+}
+#url-line.oneline {
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-height: none;
+}
+#url-line:focus-within { border-color: var(--mauve); }
+
+/* a run of the URL belonging to one section */
+.sect { border-radius: 4px; padding: 1px 0; }
+.sect.hot { background: rgba(203, 166, 247, 0.12); }
+.sect.on { background: rgba(203, 166, 247, 0.18); box-shadow: inset 0 -2px 0 var(--mauve); }
+
+.pt { border-radius: 3px; cursor: pointer; padding: 1px 1px; }
+.pt:hover { background: var(--surface0); }
+.pt.on { background: var(--surface1); box-shadow: inset 0 -2px 0 var(--lavender); }
+.pt.changed { box-shadow: inset 0 -2px 0 var(--staged); }
+
+#url-line input {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--surface0);
+  border: none;
+  outline: 1px solid var(--mauve);
+  border-radius: 3px;
+  color: var(--text);
+  padding: 0 2px;
+  min-width: 40px;
+}
+
+.bar-tools { display: flex; gap: 4px; padding-top: 2px; flex-shrink: 0; }
+
+/* --- section strip: one cell per section, each with a caret --- */
+.strip {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 0 12px 8px;
+}
+.cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--surface0);
+  border-right-width: 0;
+  background: var(--mantle);
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.cell:first-child { border-radius: 6px 0 0 6px; }
+.cell:last-child { border-radius: 0 6px 6px 0; border-right-width: 1px; }
+.cell:hover { background: var(--surface0); color: var(--text); }
+.cell.on { background: #2b2640; border-color: var(--mauve); color: var(--text); }
+.cell.on + .cell { border-left-color: var(--mauve); }
+.cell .nm { font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; font-size: 10px; }
+.cell .ct { color: var(--surface2); font-family: var(--mono); font-size: 10.5px; }
+.cell .cv { color: var(--surface2); font-size: 9px; }
+.strip .grow { flex: 1; }
+.strip .tools { display: flex; gap: 5px; align-items: center; }
+
+/* --- drawer --- */
+#drawer {
+  border-top: 1px solid var(--surface0);
+  background: var(--mantle);
+  max-height: 260px;
+  overflow-y: auto;
+}
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--surface0);
+  position: sticky;
+  top: 0;
+  background: var(--mantle);
+  z-index: 1;
+}
+.drawer-head .t {
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--mauve);
+  font-weight: 700;
+}
+.drawer-head .sub { font-size: 10.5px; color: var(--surface2); flex: 1; }
+
+.drow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-bottom: 1px solid #24243550;
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+.drow:hover { background: #242436; }
+.drow.on { background: #2a2a3f; }
+.drow.changed { box-shadow: inset 2px 0 0 var(--staged); }
+.drow .n {
+  width: 18px;
+  color: var(--surface2);
+  font-size: 10px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.drow .k { color: var(--blue); flex-shrink: 0; }
+.drow .eq { color: var(--surface2); }
+.drow .v { color: var(--green); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drow .v.seg { color: var(--peach); }
+.drow .acts { display: flex; gap: 2px; opacity: 0; flex-shrink: 0; }
+.drow:hover .acts, .drow.on .acts { opacity: 1; }
+.drow input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--crust);
+  border: 1px solid var(--mauve);
+  border-radius: 3px;
+  color: var(--text);
+  padding: 1px 4px;
+  outline: none;
+}
+.iconb {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  line-height: 1;
+  font-family: inherit;
+}
+.iconb:hover { background: var(--surface0); color: var(--text); }
+.iconb.danger:hover { color: var(--red); }
+
+.peelbox { padding: 7px 12px 10px 42px; background: var(--crust); border-bottom: 1px solid var(--surface0); }
+.peelbox .lbl {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--surface2);
+  margin: 5px 0 2px;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.peelbox pre {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  background: var(--base);
+  border-radius: 4px;
+  padding: 5px 7px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 88px;
+  overflow: auto;
+}
+.peelbox pre.last { color: var(--text); }
+
+.pop-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--surface0);
+  background: var(--mantle);
+}
+.pop-foot .change-summary { flex: 1; font-size: 11px; color: var(--muted); }
+.pop-foot.dirty .change-summary { color: var(--staged); font-weight: 600; }
+
+.hint { font-size: 10.5px; color: var(--surface2); padding: 0 12px 8px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="demo-bar">
+    <span class="demo-tag">demo url</span>
+    <button data-sample="short">short</button>
+    <button data-sample="typical" aria-pressed="true">typical</button>
+    <button data-sample="monster">monster</button>
+    <span class="spacer"></span>
+    <span>popup 800 × ~300, under the real address bar</span>
+  </div>
+
+  <div id="browser">
+    <div class="tabstrip">
+      <div class="tab on">Running shoes — Example Shop</div>
+      <div class="tab">Docs</div>
+      <div class="tab">Mail</div>
+    </div>
+    <div class="omnibar">
+      <span class="omni-nav">← → ⟳</span>
+      <span class="omni-field"><span>🔒</span><span class="u" id="omni-url"></span></span>
+      <span class="ext-icon" title="Snatch URL">S</span>
+    </div>
+
+    <div id="page">
+      <div class="blk" style="height:22px;width:46%"></div>
+      <div class="blk" style="height:10px;width:88%"></div>
+      <div class="blk" style="height:10px;width:74%"></div>
+      <div style="display:flex;gap:14px;margin:14px 0">
+        <div class="blk" style="height:150px;width:210px;margin:0"></div>
+        <div style="flex:1">
+          <div class="blk" style="height:14px;width:60%"></div>
+          <div class="blk" style="height:10px;width:92%"></div>
+          <div class="blk" style="height:10px;width:86%"></div>
+          <div class="blk" style="height:10px;width:70%"></div>
+          <div class="blk" style="height:26px;width:120px;margin-top:14px"></div>
+        </div>
+      </div>
+      <div class="blk" style="height:10px;width:81%"></div>
+      <div class="blk" style="height:10px;width:66%"></div>
+      <div class="blk" style="height:10px;width:78%"></div>
+      <div style="display:flex;gap:14px;margin-top:14px">
+        <div class="blk" style="height:90px;flex:1;margin:0"></div>
+        <div class="blk" style="height:90px;flex:1;margin:0"></div>
+        <div class="blk" style="height:90px;flex:1;margin:0"></div>
+      </div>
+    </div>
+
+    <!-- The prototype. Everything above is a mock browser. -->
+    <div id="popup">
+      <div class="pop-head">
+        <h1>Snatch URL</h1>
+        <span class="variant">E · Second Address Bar</span>
+        <button class="btn btn-sm" id="oneline-btn" title="Collapse to a single scrolling line">one line</button>
+        <button class="btn btn-sm" id="decoded-btn" title="Show the URL decoded">decoded</button>
+      </div>
+
+      <div class="bar">
+        <span class="bar-lock">🔗</span>
+        <div id="url-line"></div>
+        <div class="bar-tools">
+          <button class="btn btn-sm" id="copy-url" title="Copy the whole URL">⎘ URL</button>
+        </div>
+      </div>
+
+      <div class="strip" id="strip"></div>
+
+      <div id="drawer" class="hidden"></div>
+
+      <div class="pop-foot" id="status-bar">
+        <span class="change-summary" id="change-summary" role="status">No unapplied changes</span>
+        <button class="btn btn-sm" id="revert-btn" disabled>Revert</button>
+        <button class="btn btn-sm" id="new-btn" disabled>New tab</button>
+        <button class="btn btn-sm btn-primary" id="apply-btn" disabled>Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="keys">
+    <span><kbd>click a part</kbd> type over it</span>
+    <span><kbd>click a section</kbd> open its drawer</span>
+    <span><kbd>⌥←→</kbd> part to part</span>
+    <span><kbd>⌫</kbd> delete</span>
+    <span><kbd>esc</kbd> close</span>
+    <span><kbd>⌘↵</kbd> apply</span>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+</div>
+
+<script type="module">
+import {
+  SAMPLES, tokenize, tokensIn, groupRange, peel, badgeFor,
+  encodeFor, spliceRaw, ROLE_LABEL, isPunct, countChanges,
+} from './proto-core.js';
+
+const $ = id => document.getElementById(id);
+
+let baseText = SAMPLES.typical;
+let text = baseText;
+let tok = tokenize(text);
+let baseTok = tokenize(baseText);
+let openSection = null;   // 'origin' | 'path' | 'query' | 'hash'
+let activeId = null;      // the part being worked on
+let peelId = null;        // the part whose decode stack is unfolded
+let decodedView = false;
+
+const SECTIONS = [
+  { key: 'origin', name: 'host' },
+  { key: 'path', name: 'path' },
+  { key: 'query', name: 'query' },
+  { key: 'hash', name: '#' },
+];
+
+// Params a URL is usually better off without. "Clean" is the kind of function
+// a second address bar can have and the real one never will.
+const TRACKING = /^(utm_|fbclid$|gclid$|gbraid$|wbraid$|msclkid$|yclid$|igshid$|mc_cid$|mc_eid$|_ga$|_gl$|vero_|mkt_tok$)/i;
+
+const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+// --- render ------------------------------------------------------------
+
+function changedSet() {
+  if (!tok.ok || !baseTok.ok) return new Set();
+  const base = new Map(baseTok.tokens.filter(t => t.editable).map(t => [t.id, t.raw]));
+  const out = new Set();
+  for (const t of tok.tokens) {
+    if (t.editable && (!base.has(t.id) || base.get(t.id) !== t.raw)) out.add(t.id);
+  }
+  return out;
+}
+
+function renderBar() {
+  $('omni-url').textContent = baseText;
+  const line = $('url-line');
+
+  if (!tok.ok) {
+    line.textContent = text;
+    return;
+  }
+
+  const changed = changedSet();
+  let html = '';
+  let current = null;
+
+  for (const t of tok.tokens) {
+    if (t.group !== current) {
+      if (current !== null) html += '</span>';
+      current = t.group;
+      const on = openSection === current ? ' on' : '';
+      html += `<span class="sect${on}" data-section="${current}">`;
+    }
+    const shown = decodedView && t.editable ? t.text : t.raw;
+    if (t.editable) {
+      const cls = 'pt r-' + t.role
+        + (changed.has(t.id) ? ' changed' : '')
+        + (activeId === t.id ? ' on' : '');
+      html += `<span class="${cls}" data-id="${t.id}" title="${esc(ROLE_LABEL[t.role])}">${esc(shown)}</span>`;
+    } else {
+      html += `<span class="r-${t.role}">${esc(t.raw)}</span>`;
+    }
+  }
+  if (current !== null) html += '</span>';
+  line.innerHTML = html;
+}
+
+function renderStrip() {
+  if (!tok.ok) { $('strip').innerHTML = ''; return; }
+
+  const counts = {
+    origin: tok.tokens.filter(t => t.group === 'origin' && t.editable).length,
+    path: tok.tokens.filter(t => t.role === 'seg').length,
+    query: tok.tokens.filter(t => t.role === 'key').length,
+    hash: tok.tokens.filter(t => t.role === 'hash').length,
+  };
+  const label = {
+    origin: () => (tok.tokens.find(t => t.role === 'host') || {}).text || '',
+    path: () => `${counts.path} segment${counts.path === 1 ? '' : 's'}`,
+    query: () => `${counts.query} param${counts.query === 1 ? '' : 's'}`,
+    hash: () => (tok.tokens.find(t => t.role === 'hash') || {}).text || 'none',
+  };
+
+  const cells = SECTIONS.map(s => {
+    const has = counts[s.key] > 0;
+    return `<div class="cell ${openSection === s.key ? 'on' : ''}" data-section="${s.key}"
+              ${has ? '' : 'style="opacity:.45"'}>
+              <span class="nm">${s.name}</span>
+              <span class="ct">${esc(label[s.key]())}</span>
+              <span class="cv">▾</span>
+            </div>`;
+  }).join('');
+
+  $('strip').innerHTML = cells
+    + '<span class="grow"></span>'
+    + `<span class="tools">
+         <button class="btn btn-sm" id="clean-btn" title="Strip utm_* and other tracking parameters">⚡ Clean</button>
+         <button class="btn btn-sm" id="add-btn" title="Add a query parameter">+ param</button>
+       </span>`;
+}
+
+function renderDrawer() {
+  const box = $('drawer');
+  if (!openSection || !tok.ok) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  box.classList.remove('hidden');
+
+  const changed = changedSet();
+  const sec = SECTIONS.find(s => s.key === openSection);
+  const rows = [];
+
+  if (openSection === 'query') {
+    const params = [];
+    for (const t of tok.tokens) {
+      if (t.role === 'key') params.push({ key: t, val: null });
+      if (t.role === 'val' && params.length) params.at(-1).val = t;
+    }
+    params.forEach((p, i) => rows.push(paramRow(p, i, changed)));
+  } else {
+    tok.tokens.filter(t => t.group === openSection && t.editable)
+      .forEach((t, i) => rows.push(simpleRow(t, i, changed)));
+  }
+
+  box.innerHTML = `
+    <div class="drawer-head">
+      <span class="t">${sec.name}</span>
+      <span class="sub">${rows.length} ${openSection === 'query' ? 'param' : 'part'}${rows.length === 1 ? '' : 's'} · click a row to edit it</span>
+      <button class="btn btn-sm" data-sec="copy">⎘ Copy section</button>
+      <button class="btn btn-sm" data-sec="copy-plain">⎘ Copy decoded</button>
+      ${openSection === 'query' ? '<button class="btn btn-sm btn-danger" data-sec="clear">Clear</button>' : ''}
+    </div>
+    ${rows.join('') || '<div class="hint" style="padding:10px 12px">Nothing here.</div>'}`;
+}
+
+function rowActions(id, canPeel) {
+  return `<span class="acts">
+    ${canPeel ? `<button class="iconb" data-act="peel" data-id="${id}" title="Look inside">⌄</button>` : ''}
+    <button class="iconb" data-act="copy" data-id="${id}" title="Copy">⎘</button>
+    <button class="iconb danger" data-act="del" data-id="${id}" title="Delete">✕</button>
+  </span>`;
+}
+
+function simpleRow(t, i, changed) {
+  const badge = badgeFor(t.raw);
+  const shown = peel(t.raw).at(-1).text;
+  return `<div class="drow ${changed.has(t.id) ? 'changed' : ''} ${activeId === t.id ? 'on' : ''}" data-id="${t.id}">
+      <span class="n">${i + 1}</span>
+      <span class="v seg" data-edit="${t.id}">${esc(shown)}</span>
+      ${badge ? `<span class="badge ${badge}">${badge === 'encoded' ? '%' : badge}</span>` : ''}
+      ${rowActions(t.id, peel(t.raw).length > 1)}
+    </div>${peelId === t.id ? peelHtml(t) : ''}`;
+}
+
+function paramRow(p, i, changed) {
+  const t = p.val || p.key;
+  const badge = p.val ? badgeFor(p.val.raw) : null;
+  const dirty = changed.has(p.key.id) || (p.val && changed.has(p.val.id));
+  const shown = p.val ? peel(p.val.raw).at(-1).text : '';
+  return `<div class="drow ${dirty ? 'changed' : ''} ${activeId === t.id ? 'on' : ''}" data-id="${t.id}">
+      <span class="n">${i + 1}</span>
+      <span class="k" data-edit="${p.key.id}">${esc(p.key.text)}</span>
+      ${p.val ? '<span class="eq">=</span>' : '<span class="eq" style="font-size:10px">no value</span>'}
+      ${p.val ? `<span class="v" data-edit="${p.val.id}">${esc(shown)}</span>` : '<span class="v"></span>'}
+      ${badge ? `<span class="badge ${badge}">${badge === 'encoded' ? '%' : badge}</span>` : ''}
+      ${rowActions(t.id, !!(p.val && peel(p.val.raw).length > 1))}
+    </div>${p.val && peelId === p.val.id ? peelHtml(p.val) : ''}`;
+}
+
+function peelHtml(t) {
+  const layers = peel(t.raw);
+  return `<div class="peelbox">
+    ${layers.map((l, i) => `
+      <div class="lbl">${l.label}${l.isUrl ? ' <span class="badge url">nested url</span>' : ''}</div>
+      <pre class="${i === layers.length - 1 ? 'last' : ''}">${esc(l.text)}</pre>`).join('')}
+    <div style="display:flex;gap:5px;margin-top:7px">
+      <button class="btn btn-sm" data-act="copy-plain" data-id="${t.id}">Copy decoded</button>
+      <button class="btn btn-sm" data-act="edit" data-id="${t.id}">Edit decoded</button>
+    </div>
+  </div>`;
+}
+
+function renderFoot() {
+  const dirty = text !== baseText;
+  const n = tok.ok && baseTok.ok ? countChanges(baseText, text, baseTok.tokens, tok.tokens) : 1;
+  $('change-summary').textContent = dirty
+    ? `${n} unapplied change${n === 1 ? '' : 's'}`
+    : 'No unapplied changes';
+  $('status-bar').classList.toggle('dirty', dirty);
+  for (const id of ['apply-btn', 'new-btn', 'revert-btn']) $(id).disabled = !dirty;
+}
+
+function render() {
+  renderBar();
+  renderStrip();
+  renderDrawer();
+  renderFoot();
+}
+
+// --- edits -------------------------------------------------------------
+
+function setText(next) {
+  text = next;
+  tok = tokenize(text);
+  render();
+}
+
+function tokenById(id) {
+  return tok.ok ? tok.tokens.find(t => t.id === id) || null : null;
+}
+
+/** Type over a part, in the bar or in the drawer. */
+function editPart(id, where, decoded) {
+  const t = tokenById(id);
+  if (!t) return;
+  const host = where === 'bar'
+    ? $('url-line').querySelector(`.pt[data-id="${id}"]`)
+    : $('drawer').querySelector(`[data-edit="${id}"]`);
+  if (!host) return;
+
+  const input = document.createElement('input');
+  input.value = decoded || t.role === 'val' || t.role === 'seg' ? peel(t.raw).at(-1).text : t.text;
+  input.size = Math.max(4, input.value.length);
+  input.setAttribute('aria-label', 'Type over this part');
+  host.replaceWith(input);
+  input.focus();
+  input.select();                       // type-over
+
+  let committed = false;
+  const commit = ok => {
+    if (committed) return;
+    committed = true;
+    if (!ok) { render(); return; }
+    const raw = encodeFor(t.role, input.value);
+    setText(spliceRaw(text, t.start, t.end, raw));
+    flash('Staged - press Apply to send it to the tab.');
+  };
+  input.addEventListener('blur', () => commit(true));
+  input.addEventListener('input', () => { input.size = Math.max(4, input.value.length); });
+  input.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); commit(true); }
+    if (e.key === 'Escape') { e.preventDefault(); commit(false); }
+  });
+}
+
+/** A part plus the punctuation that would be left dangling without it. */
+function rangeToDelete(t) {
+  const all = tok.tokens;
+  const i = all.indexOf(t);
+  let from = t.start, to = t.end;
+  if (t.role === 'seg') {
+    if (all[i - 1] && all[i - 1].role === 'sep') from = all[i - 1].start;
+  } else if (t.role === 'key' || t.role === 'val') {
+    const pair = all.filter(x => ['key', 'eq', 'val'].includes(x.role) && x.index === t.index);
+    from = pair[0].start;
+    to = pair.at(-1).end;
+    const before = all[all.indexOf(pair[0]) - 1];
+    const after = all[all.indexOf(pair.at(-1)) + 1];
+    if (before && before.role === 'amp') from = before.start;
+    else if (after && after.role === 'amp') to = after.end;
+    else if (before && before.role === 'qmark') from = before.start;
+  } else if (t.role === 'hash') {
+    from = t.start;
+    to = t.end;
+  }
+  return [from, to];
+}
+
+function deleteParts(list) {
+  if (!list.length) return;
+  const ranges = list.map(rangeToDelete).sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  for (const r of ranges) {
+    const last = merged.at(-1);
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+    else merged.push([...r]);
+  }
+  let next = text;
+  for (const [from, to] of [...merged].reverse()) next = spliceRaw(next, from, to, '');
+  activeId = null;
+  peelId = null;
+  setText(next);
+}
+
+function addParam() {
+  const has = tok.tokens.some(t => t.role === 'key');
+  const hashTok = tok.tokens.find(t => t.role === 'hash');
+  const at = hashTok ? hashTok.start : text.length;
+  const next = spliceRaw(text, at, at, `${has ? '&' : '?'}key=value`);
+  setText(next);
+  openSection = 'query';
+  render();
+  const keys = tok.tokens.filter(t => t.role === 'key');
+  const last = keys.at(-1);
+  if (last) { activeId = last.id; render(); editPart(last.id, 'drawer'); }
+}
+
+function clean() {
+  const doomed = tok.tokens.filter(t => t.role === 'key' && TRACKING.test(t.text));
+  if (!doomed.length) { flash('No tracking parameters to strip.', true); return; }
+  deleteParts(doomed);
+  flash(`Stripped ${doomed.length} tracking parameter${doomed.length === 1 ? '' : 's'}.`);
+}
+
+// --- interaction -------------------------------------------------------
+
+$('url-line').addEventListener('click', e => {
+  const part = e.target.closest('.pt');
+  if (part) {
+    activeId = part.dataset.id;
+    const t = tokenById(activeId);
+    if (t) openSection = t.group;
+    render();
+    editPart(activeId, 'bar');
+    return;
+  }
+  const sect = e.target.closest('.sect');
+  if (sect) { openSection = sect.dataset.section; activeId = null; render(); }
+});
+
+$('url-line').addEventListener('mouseover', e => {
+  const sect = e.target.closest('.sect');
+  for (const s of $('url-line').querySelectorAll('.sect.hot')) s.classList.remove('hot');
+  if (sect) sect.classList.add('hot');
+});
+
+$('strip').addEventListener('click', e => {
+  const cell = e.target.closest('.cell');
+  if (cell) {
+    openSection = openSection === cell.dataset.section ? null : cell.dataset.section;
+    activeId = null;
+    peelId = null;
+    render();
+    return;
+  }
+  if (e.target.closest('#clean-btn')) clean();
+  if (e.target.closest('#add-btn')) addParam();
+});
+
+$('drawer').addEventListener('click', e => {
+  const sec = e.target.closest('[data-sec]');
+  if (sec) {
+    const r = groupRange(tok.tokens, openSection);
+    if (!r) return;
+    if (sec.dataset.sec === 'copy') copy(text.slice(r.start, r.end));
+    if (sec.dataset.sec === 'copy-plain') {
+      // The section as it reads, not as it is written: every part decoded,
+      // punctuation left alone.
+      copy(tok.tokens
+        .filter(t => t.group === openSection)
+        .map(t => (t.editable ? peel(t.raw).at(-1).text : t.raw))
+        .join(''));
+    }
+    if (sec.dataset.sec === 'clear') {
+      deleteParts(tok.tokens.filter(t => t.role === 'key'));
+      flash('Query cleared - Revert puts it back.');
+    }
+    return;
+  }
+
+  const btn = e.target.closest('[data-act]');
+  if (btn) {
+    const t = tokenById(btn.dataset.id);
+    if (!t) return;
+    const act = btn.dataset.act;
+    if (act === 'copy') copy(t.raw);
+    else if (act === 'copy-plain') copy(peel(t.raw).at(-1).text);
+    else if (act === 'del') deleteParts([t]);
+    else if (act === 'peel') { peelId = peelId === t.id ? null : t.id; render(); }
+    else if (act === 'edit') { activeId = t.id; render(); editPart(t.id, 'drawer', true); }
+    return;
+  }
+
+  const field = e.target.closest('[data-edit]');
+  if (field) {
+    activeId = field.dataset.edit;
+    editPart(field.dataset.edit, 'drawer');
+    return;
+  }
+
+  const row = e.target.closest('.drow');
+  if (row) { activeId = row.dataset.id; render(); }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  const parts = tok.ok ? tok.tokens.filter(t => t.editable) : [];
+  const at = parts.findIndex(t => t.id === activeId);
+
+  if (e.altKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+    e.preventDefault();
+    const next = parts[Math.max(0, Math.min(parts.length - 1, at + (e.key === 'ArrowRight' ? 1 : -1)))];
+    if (next) { activeId = next.id; openSection = next.group; render(); }
+  } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault(); apply();
+  } else if (e.key === 'Enter' && activeId) {
+    e.preventDefault(); editPart(activeId, 'bar');
+  } else if ((e.key === 'Backspace' || e.key === 'Delete') && activeId) {
+    e.preventDefault();
+    const t = tokenById(activeId);
+    if (t) deleteParts([t]);
+  } else if (e.key === 'Escape') {
+    openSection = null; activeId = null; peelId = null; render();
+  }
+});
+
+$('oneline-btn').onclick = () => {
+  const on = $('url-line').classList.toggle('oneline');
+  $('oneline-btn').setAttribute('aria-pressed', String(on));
+  flash(on ? 'One line, scrolls sideways - the purest address-bar shape.' : 'Wrapped, so you can see all of it.');
+};
+
+$('decoded-btn').onclick = () => {
+  decodedView = !decodedView;
+  $('decoded-btn').setAttribute('aria-pressed', String(decodedView));
+  render();
+  flash(decodedView ? 'Showing what the URL says. Edits still write proper encoding.' : 'Showing the URL as written.');
+};
+
+$('copy-url').onclick = () => copy(text);
+
+// --- chrome ------------------------------------------------------------
+
+function copy(s) {
+  const done = () => flash('Copied: ' + (s.length > 44 ? s.slice(0, 44) + '…' : s));
+  const legacy = () => {
+    const ta = document.createElement('textarea');
+    ta.value = s;
+    ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+    document.body.append(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    ta.remove();
+    ok ? done() : flash('Clipboard blocked here - open this prototype in its own tab.', true);
+  };
+  if (!navigator.clipboard) { legacy(); return; }
+  navigator.clipboard.writeText(s).then(done, legacy);
+}
+
+let toastTimer = null;
+function flash(msg, bad) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.toggle('err', !!bad);
+  el.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 2400);
+}
+
+function apply() {
+  if (text === baseText) return;
+  baseText = text;
+  baseTok = tokenize(baseText);
+  render();
+  flash('Applied - the tab would navigate here.');
+}
+
+$('apply-btn').onclick = apply;
+$('new-btn').onclick = () => flash('Would open a new tab at the edited URL.');
+$('revert-btn').onclick = () => { activeId = null; peelId = null; setText(baseText); flash('Reverted.'); };
+
+for (const btn of document.querySelectorAll('[data-sample]')) {
+  btn.onclick = () => {
+    for (const b of document.querySelectorAll('[data-sample]')) b.setAttribute('aria-pressed', 'false');
+    btn.setAttribute('aria-pressed', 'true');
+    baseText = SAMPLES[btn.dataset.sample];
+    baseTok = tokenize(baseText);
+    openSection = null; activeId = null; peelId = null;
+    setText(baseText);
+  };
+}
+
+render();
+</script>
+</body>
+</html>
