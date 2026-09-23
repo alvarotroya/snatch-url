@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snatch URL · demo</title>
+<style>
+/* A mock browser around the REAL popup, so the second address bar can be
+   tried in any browser with no extension installed. The popup itself is
+   popup.html + popup.js + styles.css from the repository root, unchanged;
+   only chrome.tabs is stubbed, by the script at the bottom of this file. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --base: #1e1e2e;
+  --mantle: #181825;
+  --crust: #11111b;
+  --surface0: #313244;
+  --surface1: #45475a;
+  --surface2: #585b70;
+  --text: #cdd6f4;
+  --muted: #a6adc8;
+  --mauve: #cba6f7;
+  --green: #a6e3a1;
+  --red: #f38ba8;
+  --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  background: #0b0b12;
+  color: var(--text);
+  overflow: hidden;
+}
+#app { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+
+/* --- Demo controls, not part of the popup --- */
+.demo-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--crust);
+  border-bottom: 1px dashed var(--surface1);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.demo-bar button {
+  background: transparent;
+  border: 1px solid var(--surface0);
+  border-radius: 999px;
+  color: var(--muted);
+  font: inherit;
+  padding: 2px 9px;
+  cursor: pointer;
+}
+.demo-bar button:hover { color: var(--text); border-color: var(--surface1); }
+.demo-bar button[aria-pressed="true"] { background: var(--surface0); color: var(--text); border-color: var(--surface1); }
+.demo-bar form { display: flex; gap: 4px; align-items: center; flex: 1; min-width: 240px; }
+.demo-bar input {
+  flex: 1;
+  min-width: 0;
+  background: var(--base);
+  border: 1px solid var(--surface0);
+  border-radius: 999px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 10px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.demo-bar input:focus { outline: none; border-color: var(--mauve); }
+
+/* --- The mock browser --- */
+#browser { position: relative; flex: 1; min-height: 0; background: var(--crust); overflow: hidden; }
+.tabstrip { display: flex; align-items: flex-end; gap: 4px; padding: 6px 10px 0; background: #0d0d15; }
+.tab {
+  font-size: 11px;
+  color: var(--surface2);
+  background: #15151f;
+  border-radius: 7px 7px 0 0;
+  padding: 5px 12px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tab.on { background: var(--mantle); color: var(--muted); }
+.omnibar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--mantle);
+  border-bottom: 1px solid #0d0d15;
+}
+.omni-nav { color: var(--surface2); font-size: 12px; letter-spacing: 2px; }
+.omni-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #0d0d15;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--surface2);
+}
+.omni-field .u { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.ext-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--mauve);
+  color: var(--base);
+  font-size: 12px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 0 3px rgba(203, 166, 247, 0.22);
+  cursor: pointer;
+  border: none;
+}
+
+/* The page behind the popup: the notes, deliberately quiet. */
+#page {
+  padding: 24px 28px;
+  height: calc(100% - 70px);
+  overflow-y: auto;
+  max-width: 760px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+#page h1 { font-size: 15px; color: var(--text); margin-bottom: 10px; }
+#page h2 { font-size: 12px; color: var(--mauve); letter-spacing: 0.06em; text-transform: uppercase; margin: 22px 0 6px; }
+#page p, #page li { margin-bottom: 5px; }
+#page ul, #page ol { padding-left: 18px; }
+#page code { font-family: var(--mono); font-size: 11.5px; color: var(--text); background: var(--surface0); border-radius: 3px; padding: 0 4px; }
+#page kbd { font-family: var(--mono); font-size: 11px; color: var(--text); background: var(--surface0); border-radius: 3px; padding: 0 5px; }
+#log { font-family: var(--mono); font-size: 11.5px; }
+#log li { overflow-wrap: anywhere; }
+#log li.nav { color: var(--green); }
+#log li.new { color: var(--mauve); }
+
+/* --- THE POPUP: the real one, in a frame sized the way a popup is --- */
+#popup {
+  position: absolute;
+  top: 62px;
+  right: 8px;
+  width: 800px;
+  max-width: calc(100% - 16px);
+  border: 1px solid var(--surface1);
+  border-radius: 10px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  background: var(--base);
+}
+#popup::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  right: 14px;
+  width: 10px;
+  height: 10px;
+  background: var(--base);
+  border-left: 1px solid var(--surface1);
+  border-top: 1px solid var(--surface1);
+  transform: rotate(45deg);
+}
+#popup-frame { display: block; width: 100%; height: 200px; border: none; background: var(--base); }
+#popup.closed { display: none; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="demo-bar">
+    <span>tab url</span>
+    <button type="button" data-sample="short">short</button>
+    <button type="button" data-sample="typical">typical</button>
+    <button type="button" data-sample="monster" aria-pressed="true">monster</button>
+    <form id="custom">
+      <input id="custom-url" type="text" placeholder="…or paste any URL and press Enter" aria-label="Tab URL" spellcheck="false">
+      <button type="submit">go</button>
+    </form>
+    <button type="button" id="reopen-btn" title="Close and reopen the popup, as clicking the toolbar icon would">reopen popup</button>
+  </div>
+
+  <div id="browser">
+    <div class="tabstrip">
+      <div class="tab on" id="tab-title">Snatch URL demo</div>
+      <div class="tab">Docs</div>
+      <div class="tab">Mail</div>
+    </div>
+    <div class="omnibar">
+      <span class="omni-nav" aria-hidden="true">← → ⟳</span>
+      <span class="omni-field"><span aria-hidden="true">🔒</span><span class="u" id="omni-url"></span></span>
+      <button class="ext-icon" id="icon-btn" title="Snatch URL - click to reopen the popup" aria-label="Open the Snatch URL popup">S</button>
+    </div>
+
+    <div id="page">
+      <h1>Snatch URL, the second address bar</h1>
+      <p>
+        The popup above is the extension's real <code>popup.html</code>, <code>popup.js</code> and
+        <code>styles.css</code>, loaded from the repository root and given a fake tab to work on.
+        Click a part of the URL to type over it, click a section cell to open its drawer, try
+        <kbd>⚡ Clean</kbd> on the monster URL, and press <kbd>Apply</kbd>: the mock address bar above
+        follows, and the log below records what the extension asked the browser to do.
+      </p>
+
+      <h2>What happened</h2>
+      <ol id="log"></ol>
+
+      <h2>What this demo cannot show</h2>
+      <ul>
+        <li>The real popup closes when it loses focus and reopens fresh from the toolbar icon;
+          <kbd>reopen popup</kbd> stands in for that.</li>
+        <li>Chrome sizes the real popup from its content and caps it at 800 × 600; the frame here
+          mimics that cap but is not the browser's own bubble, and Firefox's panel is not simulated.</li>
+        <li>Restricted pages (<code>chrome://</code>, the Web Store, <code>about:</code>) fail in the
+          real popup with a "Can't edit this page" message; the fake tab never refuses.</li>
+        <li>Clipboard access runs under this page's permissions, not the extension's.</li>
+        <li>Navigation is simulated: nothing is loaded, only the mock address bar changes.</li>
+      </ul>
+
+      <h2>Running it</h2>
+      <p>
+        Serve the repository root over HTTP (<code>python3 -m http.server 8000</code>) and open
+        <code>/docs/demo/</code>. A <code>file://</code> open does not work: the popup is an ES
+        module, which browsers refuse to load from disk.
+      </p>
+    </div>
+
+    <div id="popup">
+      <iframe id="popup-frame" title="Snatch URL popup" allow="clipboard-write"></iframe>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="demo.js"></script>
+</body>
+</html>

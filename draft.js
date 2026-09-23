@@ -139,6 +139,19 @@ export function addParam(draft, key, value) {
   return result;
 }
 
+/**
+ * Take back a parameter that was added in this draft and never kept, such as
+ * + param's placeholder when its name is cancelled. It was never on the tab,
+ * so nothing is staged: the draft reads as if it had not been added.
+ */
+export function discardAdded(draft, index) {
+  const entry = draft.work.entries[index];
+  if (!entry || rowStatus(draft, 'entry', entry) !== 'added') {
+    return { ok: false, error: 'Only a new parameter can be discarded.' };
+  }
+  return deleteEntry(draft.work, index);
+}
+
 function stageRemoval(draft, kind, index, label, item) {
   draft.removed.push({ kind, index, uid: item.uid, label, item });
 }
@@ -167,6 +180,30 @@ export function clearQuery(draft) {
   const cleared = draft.removed.splice(from).sort((a, b) => a.index - b.index);
   draft.removed.push(...cleared);
   return { ok: true };
+}
+
+/**
+ * Query parameters a URL is usually better off without: the tracking tags
+ * marketing tools append. Clean strips exactly these, by name, and nothing
+ * else. One list, so the popup and the tests agree on it.
+ */
+export const TRACKING_KEY =
+  /^(utm_|fbclid$|gclid$|gbraid$|wbraid$|msclkid$|yclid$|igshid$|mc_cid$|mc_eid$|_ga$|_gl$|vero_|mkt_tok$)/i;
+
+/**
+ * Clean, staged: every tracking parameter is removed the way a delete
+ * removes one, so each is restorable and all of them count as changes.
+ *
+ * @returns {{ok: true, count: number}}
+ */
+export function cleanTracking(draft) {
+  const from = draft.removed.length;
+  for (let i = draft.work.entries.length - 1; i >= 0; i -= 1) {
+    if (TRACKING_KEY.test(draft.work.entries[i].key)) removeEntry(draft, i);
+  }
+  const cleared = draft.removed.splice(from).sort((a, b) => a.index - b.index);
+  draft.removed.push(...cleared);
+  return { ok: true, count: cleared.length };
 }
 
 /**

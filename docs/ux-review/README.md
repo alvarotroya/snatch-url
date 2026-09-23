@@ -1,8 +1,9 @@
 # UX review — eight prototypes of a more direct popup
 
-> **The captain is choosing a UX direction from this review. No code should be written into the
-> extension until he has.** Build nothing from these prototypes on your own initiative — they exist
-> so he can decide, not as a queue of work.
+> **Decided: prototype E, the second address bar, is what the extension now is.** The popup in the
+> repository root is E rebuilt on the real staging layer; `docs/demo/` runs it in a mock browser.
+> The other seven prototypes stay here as the record of what was tried and why, and as a source of
+> mechanisms (A's character selection, G's action bar, H's filter) if the owner wants one added.
 
 ## Open the review
 

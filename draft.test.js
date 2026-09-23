@@ -21,9 +21,12 @@ import {
   editKey,
   editValue,
   addParam,
+  discardAdded,
   removeSegment,
   removeEntry,
   clearQuery,
+  cleanTracking,
+  TRACKING_KEY,
   restoreRemoved,
   revert,
   rebase,
@@ -209,4 +212,66 @@ test('staging preserves the untouched parts of the URL', () => {
   editValue(draft, 0, '3,4');
 
   assert.equal(draftUrl(draft), 'https://example.com/a%20b/c/?x=3,4&y=%zz#frag');
+});
+
+// --- Clean: tracking parameters, staged ---
+
+const TRACKED = 'https://example.com/p?q=shoes&utm_source=newsletter&utm_medium=email&fbclid=abc&debug#top';
+
+test('TRACKING_KEY matches the usual suspects and nothing near them', () => {
+  for (const key of ['utm_source', 'UTM_Campaign', 'fbclid', 'gclid', 'msclkid', 'mc_eid', '_ga', '_gl', 'vero_id', 'mkt_tok']) {
+    assert.ok(TRACKING_KEY.test(key), key);
+  }
+  for (const key of ['utm', 'utmx', 'q', 'gclid2', 'ga', 'debug', 'ref']) {
+    assert.ok(!TRACKING_KEY.test(key), key);
+  }
+});
+
+test('cleanTracking strips only the tracking params and reports how many', () => {
+  const draft = createDraft(TRACKED);
+  assert.deepEqual(cleanTracking(draft), { ok: true, count: 3 });
+  assert.equal(draftUrl(draft), 'https://example.com/p?q=shoes&debug#top');
+  assert.equal(changeCount(draft), 3);
+});
+
+test('cleanTracking is staged: each stripped param is a ghost in query order and restorable', () => {
+  const draft = createDraft(TRACKED);
+  cleanTracking(draft);
+  assert.deepEqual(draft.removed.map(r => r.label), [
+    'utm_source=newsletter', 'utm_medium=email', 'fbclid=abc',
+  ]);
+  restoreRemoved(draft, draft.removed[0].uid);
+  assert.equal(draftUrl(draft), 'https://example.com/p?q=shoes&utm_source=newsletter&debug#top');
+});
+
+test('cleanTracking on a clean URL changes nothing', () => {
+  const draft = createDraft('https://example.com/p?q=shoes&debug');
+  assert.deepEqual(cleanTracking(draft), { ok: true, count: 0 });
+  assert.equal(isDirty(draft), false);
+});
+
+test('cleanTracking leaves an earlier staged deletion in place', () => {
+  const draft = createDraft(TRACKED);
+  removeEntry(draft, 0);
+  cleanTracking(draft);
+  assert.deepEqual(draft.removed.map(r => r.label), [
+    'q=shoes', 'utm_source=newsletter', 'utm_medium=email', 'fbclid=abc',
+  ]);
+  assert.equal(draftUrl(draft), 'https://example.com/p?debug#top');
+});
+
+test('a cancelled + param placeholder is discarded, not staged', () => {
+  const draft = fresh();
+  addParam(draft, 'key', 'value');
+  assert.deepEqual(discardAdded(draft, draft.work.entries.length - 1), { ok: true });
+  assert.equal(draftUrl(draft), baseUrl(draft));
+  assert.equal(changeCount(draft), 0);
+  assert.equal(draft.removed.length, 0);
+  assert.equal(isDirty(draft), false);
+});
+
+test('discarding refuses a parameter the tab already has', () => {
+  const draft = fresh();
+  assert.equal(discardAdded(draft, 0).ok, false);
+  assert.equal(draftUrl(draft), baseUrl(draft));
 });

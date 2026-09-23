@@ -613,6 +613,36 @@ function toEntry(chunk) {
   };
 }
 
+// --- Origin ---
+
+/**
+ * The prefix split into its parts for display: scheme, optional user info,
+ * host, optional port. Joined back they are exactly `model.prefix`. When the
+ * arithmetic does not add up - an exotic URL the WHATWG parser normalises in a
+ * way the prefix does not follow - the whole prefix is returned as one host
+ * part rather than offsets that lie. Nothing here is rebuilt from the parts.
+ *
+ * @param {UrlModel} model
+ * @returns {{role: 'scheme'|'userinfo'|'host'|'port', raw: string}[]}
+ */
+function originParts(model) {
+  const whole = [{ role: 'host', raw: model.prefix }];
+  let u;
+  try {
+    u = new URL(model.href);
+  } catch {
+    return whole;
+  }
+  const userinfo = u.username + (u.password ? ':' + u.password : '');
+  const parts = [
+    { role: 'scheme', raw: u.protocol + '//' },
+    userinfo ? { role: 'userinfo', raw: userinfo + '@' } : null,
+    { role: 'host', raw: u.hostname },
+    u.port ? { role: 'port', raw: ':' + u.port } : null,
+  ].filter(Boolean);
+  return parts.map(p => p.raw).join('') === model.prefix ? parts : whole;
+}
+
 // --- Build ---
 
 /** @param {UrlModel} model @returns {string} */
@@ -887,6 +917,30 @@ function clearQuery(draft) {
   const cleared = draft.removed.splice(from).sort((a, b) => a.index - b.index);
   draft.removed.push(...cleared);
   return { ok: true };
+}
+
+/**
+ * Query parameters a URL is usually better off without: the tracking tags
+ * marketing tools append. Clean strips exactly these, by name, and nothing
+ * else. One list, so the popup and the tests agree on it.
+ */
+const TRACKING_KEY =
+  /^(utm_|fbclid$|gclid$|gbraid$|wbraid$|msclkid$|yclid$|igshid$|mc_cid$|mc_eid$|_ga$|_gl$|vero_|mkt_tok$)/i;
+
+/**
+ * Clean, staged: every tracking parameter is removed the way a delete
+ * removes one, so each is restorable and all of them count as changes.
+ *
+ * @returns {{ok: true, count: number}}
+ */
+function cleanTracking(draft) {
+  const from = draft.removed.length;
+  for (let i = draft.work.entries.length - 1; i >= 0; i -= 1) {
+    if (TRACKING_KEY.test(draft.work.entries[i].key)) removeEntry(draft, i);
+  }
+  const cleared = draft.removed.splice(from).sort((a, b) => a.index - b.index);
+  draft.removed.push(...cleared);
+  return { ok: true, count: cleared.length };
 }
 
 /**

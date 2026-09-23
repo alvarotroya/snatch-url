@@ -14,8 +14,8 @@ Do not hand-edit the PNGs; edit the script and re-run it.
 
 ## Tests
 
-`npm test` runs `node --test` (built in). `package.json` carries a test script and
-nothing else.
+`npm test` runs `node --test` (built in) over the four modules' `*.test.js`. `package.json`
+carries a test script and nothing else.
 
 ## The URL model invariant
 
@@ -30,6 +30,11 @@ escape such as `%zz` falls back to the raw text. Any change here needs a case in
 Edit functions return `{ ok }` or `{ ok: false, error }` rather than throwing, so
 the popup can restore a rejected input and show the message.
 
+`url-tokens.js` lays character offsets over `buildUrl(model)` so the popup can show
+the URL as one line with a button per part; it reads the model and never rebuilds
+it. `value-inspect.js` peels a value (percent, nested URL, base64, JSON, JWT) for
+reading only; an edit re-encodes just the percent layer.
+
 ## Staged edits
 
 `draft.js` sits between `popup.js` and the model: it holds `base` (the URL the tab is
@@ -38,9 +43,13 @@ Nothing navigates except `applyDraft` in `popup.js` - keep it that way, or F3 co
 back. Deletions are staged in `draft.removed` rather than dropped, which is what makes
 Clear All undoable. `draft.test.js` covers the staging rules.
 
-Typing must not trigger a full re-render: `change` fires on blur, so rebuilding the
-rows there would steal focus from the field the user just tabbed into. Field edits
-call `renderChrome()` (header URL and status bar) and repaint only their own row.
+The popup is prototype E of `docs/ux-review/`: the bar, a strip of section cells
+and a drawer, all rebuilt from the draft by `render()`. A type-over commits on blur
+as well as on Enter, and a blur can be the start of a click somewhere else, so a
+blur commit defers its render one tick (`scheduleRender`) and every render puts
+focus back by the element's `data-fk` key. Keep both, or clicking from one part
+straight to another loses the second click, and keyboard users lose their place.
+The Clean list is `TRACKING_KEY` in `draft.js`; Clean stages removals like any delete.
 
 ## Permissions
 
@@ -66,6 +75,22 @@ pre-flight for Firefox. `web-ext` stays an `npx` call, never a dependency. Its o
 remaining notice asks for `data_collection_permissions`, which is AMO-submission
 metadata; the captain excluded store work, so it is left out on purpose.
 
+## Popup size
+
+Measured, not assumed: Chromium 153 gives an installed popup at most **800 × 600**
+(a 900 × 700 document got a viewport of exactly 800 × 600 with scrollbars). The shell
+is 800 wide and about 180 tall shut, under 500 with the drawer open on the monster
+URL. Firefox 140 ESR gives the 800 body its 800 and sizes the panel's height from the
+content (226 shut, 486 with the query drawer open on the monster URL); it documents the
+same 600 cap, which the shell never reaches.
+
+## No-install demo
+
+`docs/demo/` mounts the real `popup.html` in an iframe (`srcdoc`, with the two
+relative paths pointed at the repository root and `window.chrome` stubbed before
+`popup.js` runs) inside a mock browser. Serve the repository root over HTTP and open
+`/docs/demo/`; `file://` cannot load the module. It is not referenced by the manifest.
+
 ## Browser verification (Chrome)
 
 `popup.html` loads `popup.js` as `type="module"`. Current Chrome ignores
@@ -75,13 +100,18 @@ metadata; the captain excluded store work, so it is left out on purpose.
    `CHROME_DEVTOOLS_AXI_CHROME_ARGS`, a fixed `CHROME_DEVTOOLS_AXI_PORT`, and a
    `CHROME_DEVTOOLS_AXI_MCP_PATH` wrapper that pushes `--categoryExtensions` onto
    `process.argv` before importing the MCP bin. Without that flag the extension tools
-   are hidden and `chrome-extension://` pages cannot be opened.
-2. `chrome-devtools-axi open <test url>` - this tab must be the active one.
+   are hidden and `chrome-extension://` pages cannot be opened. On a host with Chromium
+   rather than Chrome, the same wrapper pushes `--executablePath /usr/bin/chromium`.
+   If port 9224 is another session's, set `CHROME_DEVTOOLS_AXI_SESSION` and a port.
+2. `chrome-devtools-axi open <test url>` - this tab must be the active one. The action
+   fires on the browser's active tab, not the driver's selected page: `newpage` makes
+   the new tab active, so close it (or re-`open` in the test tab) before triggering.
 3. `POST /call` on the bridge port with `install_extension`
    (`{"name":"install_extension","args":{"path":"<repo>"},"roots":["<repo>"]}`), then
    `trigger_extension_action` (its argument is `id`, not `extensionId`). Triggering the
    action is what grants `activeTab` and opens the popup; nothing else does, and it only
-   works while an ordinary tab - not the popup - is the selected target.
+   works while an ordinary tab - not the popup - is the selected target. After editing a
+   file, `reload_extension` with the same `id`, then trigger again.
 4. The popup appears as a new page in `chrome-devtools-axi pages`; `selectpage` it, then
    `snapshot` or `screenshot`. Check an edit by re-listing pages and reading the test
    tab's URL.
@@ -112,6 +142,11 @@ and drive Marionette's line-framed JSON on port 2828:
    in the profile and the popup's `<browser>` exposes `contentDocument` /
    `contentWindow` (use `.wrappedJSObject` to see the page's `chrome` global) directly
    from chrome scope.
+
+Headless (`MOZ_HEADLESS=1 --headless`) is enough for `Addon:Install` and
+`triggerAction`, and the popup `<browser>` does appear; drive it with a length-framed
+JSON client on the Marionette port (`user_pref("marionette.port", ...)` in the
+throwaway profile, so two sessions do not collide on 2828).
 
 Beware `pkill -f` patterns that also match your own shell's command line.
 

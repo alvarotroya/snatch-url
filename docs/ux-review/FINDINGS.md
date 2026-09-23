@@ -3,9 +3,9 @@
 What the eight prototypes in this folder are, what each is good and bad at, what the captain has
 said about them, and what is already settled versus still his to decide.
 
-> **Status: the captain is choosing a direction. Do not implement any of this into the extension
-> until he has.** The open decisions are the four questions at the bottom of
-> [the review page](index.html#decide).
+> **Status: decided and built.** The captain chose E, the second address bar, and the popup in the
+> repository root is now that design on the real staging layer. `STATE.md` records which of the
+> questions below are settled, which defaults were taken from E, and what is still open.
 
 ## In one screen
 

@@ -685,6 +685,36 @@ function toEntry(chunk) {
   };
 }
 
+// --- Origin ---
+
+/**
+ * The prefix split into its parts for display: scheme, optional user info,
+ * host, optional port. Joined back they are exactly `model.prefix`. When the
+ * arithmetic does not add up - an exotic URL the WHATWG parser normalises in a
+ * way the prefix does not follow - the whole prefix is returned as one host
+ * part rather than offsets that lie. Nothing here is rebuilt from the parts.
+ *
+ * @param {UrlModel} model
+ * @returns {{role: 'scheme'|'userinfo'|'host'|'port', raw: string}[]}
+ */
+function originParts(model) {
+  const whole = [{ role: 'host', raw: model.prefix }];
+  let u;
+  try {
+    u = new URL(model.href);
+  } catch {
+    return whole;
+  }
+  const userinfo = u.username + (u.password ? ':' + u.password : '');
+  const parts = [
+    { role: 'scheme', raw: u.protocol + '//' },
+    userinfo ? { role: 'userinfo', raw: userinfo + '@' } : null,
+    { role: 'host', raw: u.hostname },
+    u.port ? { role: 'port', raw: ':' + u.port } : null,
+  ].filter(Boolean);
+  return parts.map(p => p.raw).join('') === model.prefix ? parts : whole;
+}
+
 // --- Build ---
 
 /** @param {UrlModel} model @returns {string} */

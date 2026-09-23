@@ -8,40 +8,54 @@
 </head>
 <body>
   <div id="app">
-    <header>
+    <header class="pop-head">
       <h1>Snatch URL</h1>
-      <p id="url-display" class="url-bar"></p>
+      <span class="grow"></span>
+      <button id="oneline-btn" class="btn btn-sm" aria-pressed="false"
+              title="Collapse the URL to a single line that scrolls sideways">one line</button>
+      <button id="decoded-btn" class="btn btn-sm" aria-pressed="false"
+              title="Show every part decoded; edits still write proper encoding">decoded</button>
     </header>
 
-    <div id="scroll-body">
-      <!-- Path section -->
-      <section id="path-section" aria-labelledby="path-label">
-        <div class="section-header">
-          <span class="section-label" id="path-label">PATH</span>
-          <span id="path-count" class="count-badge"></span>
-        </div>
-        <div id="no-path" class="empty-state hidden"><p>No path segments.</p></div>
-        <ul id="path-list" aria-labelledby="path-label"></ul>
-      </section>
-
-      <!-- Query section -->
-      <section id="query-section" aria-labelledby="query-label">
-        <div class="section-header">
-          <span class="section-label" id="query-label">QUERY</span>
-          <span id="query-count" class="count-badge"></span>
-          <button id="copy-all-btn" class="btn btn-sm" aria-label="Copy all path segments and query parameters as JSON">Copy All</button>
-          <button id="clear-btn" class="btn btn-sm btn-danger" aria-label="Clear all query parameters">Clear All</button>
-        </div>
-        <div id="no-query" class="empty-state hidden"><p>No query parameters.</p></div>
-        <ul id="query-list" aria-labelledby="query-label"></ul>
-      </section>
+    <!-- The second address bar: the draft URL, one button per part. -->
+    <div class="bar">
+      <span class="bar-lock" aria-hidden="true">🔗</span>
+      <div id="url-line" role="group" aria-label="URL of this tab, one button per part"></div>
+      <div class="bar-tools">
+        <button id="copy-url-btn" class="btn btn-sm" aria-label="Copy the whole URL">⎘ URL</button>
+      </div>
     </div>
 
-    <div id="add-param" class="add-section">
-      <input id="new-key" type="text" placeholder="key" class="input-key" aria-label="New parameter name">
-      <span class="sep" aria-hidden="true">=</span>
-      <input id="new-value" type="text" placeholder="value" class="input-value" aria-label="New parameter value">
-      <button id="add-btn" class="btn btn-primary" aria-label="Add query parameter">Add</button>
+    <!-- One cell per section; each opens the drawer under the bar. -->
+    <div id="strip" class="strip">
+      <button class="cell" data-section="origin" data-fk="cell:origin" aria-expanded="false" aria-controls="drawer">
+        <span class="nm">host</span><span class="ct" id="cell-origin"></span><span class="cv" aria-hidden="true">▾</span>
+      </button>
+      <button class="cell" data-section="path" data-fk="cell:path" aria-expanded="false" aria-controls="drawer">
+        <span class="nm">path</span><span class="ct" id="cell-path"></span><span class="cv" aria-hidden="true">▾</span>
+      </button>
+      <button class="cell" data-section="query" data-fk="cell:query" aria-expanded="false" aria-controls="drawer">
+        <span class="nm">query</span><span class="ct" id="cell-query"></span><span class="cv" aria-hidden="true">▾</span>
+      </button>
+      <button class="cell" data-section="hash" data-fk="cell:hash" aria-expanded="false" aria-controls="drawer">
+        <span class="nm">#</span><span class="ct" id="cell-hash"></span><span class="cv" aria-hidden="true">▾</span>
+      </button>
+      <span class="grow"></span>
+      <span class="tools">
+        <button id="clean-btn" class="btn btn-sm" title="Strip utm_* and other tracking parameters">⚡ Clean</button>
+        <button id="add-btn" class="btn btn-sm" title="Add a query parameter">+ param</button>
+      </span>
+    </div>
+
+    <div id="drawer" class="drawer hidden"></div>
+
+    <div class="keys" aria-hidden="true">
+      <span><kbd>click a part</kbd> type over it</span>
+      <span><kbd>click a section</kbd> open its drawer</span>
+      <span><kbd>← →</kbd> part to part</span>
+      <span><kbd>⌫</kbd> delete</span>
+      <span><kbd>esc</kbd> close</span>
+      <span><kbd>ctrl ↵</kbd> apply</span>
     </div>
 
     <!-- Nothing is sent to the tab until one of these is pressed (F3). -->
@@ -52,7 +66,7 @@
       <button id="apply-btn" class="btn btn-sm btn-primary" aria-label="Apply changes to this tab" disabled>Apply</button>
     </div>
 
-    <div id="error-msg" class="error hidden" role="status"></div>
+    <div id="toast" class="toast hidden" role="status"></div>
   </div>
 
   <script type="module" src="popup.js"></script>
