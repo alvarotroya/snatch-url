@@ -52,14 +52,19 @@ const NESTED_URL = /^https?:\/\/\S+$/i;
  * the value as written; each later one is what one more decoding step gives;
  * the last is the most human form of the value.
  *
+ * The percent layer decodes the way the part's own section does: a query part
+ * reads `+` as a space, a path segment or fragment keeps it a plus - pass
+ * `safeDecode` for those.
+ *
  * @param {string} raw
+ * @param {(raw: string) => string} [decode]
  * @returns {Layer[]} always at least one layer
  */
-export function peel(raw) {
+export function peel(raw, decode = decodeQueryPart) {
   const layers = [{ kind: 'raw', label: 'as written', text: raw, isUrl: false }];
   let current = raw;
 
-  const decoded = decodeQueryPart(current);
+  const decoded = decode(current);
   if (decoded !== current) {
     current = decoded;
     layers.push({ kind: 'percent', label: 'percent-decoded', text: current, isUrl: false });
@@ -94,8 +99,8 @@ export function peel(raw) {
 }
 
 /** The most human form of a value: the last layer's text. */
-export function plainText(raw) {
-  return peel(raw).at(-1).text;
+export function plainText(raw, decode) {
+  return peel(raw, decode).at(-1).text;
 }
 
 /**
@@ -104,8 +109,8 @@ export function plainText(raw) {
  *
  * @returns {'encoded'|'url'|'base64'|'json'|'jwt'|null}
  */
-export function badgeFor(raw) {
-  const layers = peel(raw);
+export function badgeFor(raw, decode) {
+  const layers = peel(raw, decode);
   const last = layers[layers.length - 1];
   if (last.isUrl) return 'url';
   if (layers.length === 1) return null;

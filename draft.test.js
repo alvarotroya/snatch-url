@@ -21,6 +21,7 @@ import {
   editKey,
   editValue,
   addParam,
+  discardAdded,
   removeSegment,
   removeEntry,
   clearQuery,
@@ -257,4 +258,20 @@ test('cleanTracking leaves an earlier staged deletion in place', () => {
     'q=shoes', 'utm_source=newsletter', 'utm_medium=email', 'fbclid=abc',
   ]);
   assert.equal(draftUrl(draft), 'https://example.com/p?debug#top');
+});
+
+test('a cancelled + param placeholder is discarded, not staged', () => {
+  const draft = fresh();
+  addParam(draft, 'key', 'value');
+  assert.deepEqual(discardAdded(draft, draft.work.entries.length - 1), { ok: true });
+  assert.equal(draftUrl(draft), baseUrl(draft));
+  assert.equal(changeCount(draft), 0);
+  assert.equal(draft.removed.length, 0);
+  assert.equal(isDirty(draft), false);
+});
+
+test('discarding refuses a parameter the tab already has', () => {
+  const draft = fresh();
+  assert.equal(discardAdded(draft, 0).ok, false);
+  assert.equal(draftUrl(draft), baseUrl(draft));
 });

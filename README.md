@@ -39,11 +39,14 @@ the bar with one row per part of that section:
 - **✕** deletes a segment or a whole parameter
 - **Copy section** and **Copy decoded** in the drawer's header copy the whole section as
   written or as it reads
-- the query drawer also has **Clear**, which removes every parameter
+- the query drawer also has **Copy All**, which puts every path segment and parameter on
+  the clipboard as a JSON object (a repeated key keeps all its values as an array), and
+  **Clear**, which removes every parameter
 
 **⚡ Clean** strips the usual tracking parameters (`utm_*`, `fbclid`, `gclid` and
 friends; the list is `TRACKING_KEY` in `draft.js`). **+ param** adds a `key=value`
-parameter and opens it for typing: the name first, then, on Enter, the value.
+parameter and opens it for typing: the name first, then, on Enter, the value. Escape, or
+leaving the name empty, takes it back out.
 
 **Applying changes.** Nothing touches the tab until you say so. Every edit, deletion
 and addition goes into a draft, and the bar at the bottom says how many changes are

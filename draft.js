@@ -139,6 +139,19 @@ export function addParam(draft, key, value) {
   return result;
 }
 
+/**
+ * Take back a parameter that was added in this draft and never kept, such as
+ * + param's placeholder when its name is cancelled. It was never on the tab,
+ * so nothing is staged: the draft reads as if it had not been added.
+ */
+export function discardAdded(draft, index) {
+  const entry = draft.work.entries[index];
+  if (!entry || rowStatus(draft, 'entry', entry) !== 'added') {
+    return { ok: false, error: 'Only a new parameter can be discarded.' };
+  }
+  return deleteEntry(draft.work, index);
+}
+
 function stageRemoval(draft, kind, index, label, item) {
   draft.removed.push({ kind, index, uid: item.uid, label, item });
 }

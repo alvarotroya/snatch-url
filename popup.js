@@ -11,6 +11,7 @@
 
 import { tokenizeModel, groupRange, isPunct, ROLE_LABEL } from './url-tokens.js';
 import { peel, badgeFor, plainText } from './value-inspect.js';
+import { safeDecode, decodeQueryPart, toJson } from './url-model.js';
 import {
   createDraft,
   draftUrl,
@@ -21,6 +22,7 @@ import {
   editKey,
   editValue,
   addParam,
+  discardAdded,
   removeSegment,
   removeEntry,
   clearQuery,
@@ -107,6 +109,19 @@ function isEditable(t) {
   return EDITABLE.has(t.role);
 }
 
+/** A part decoded the way its section is: only the query reads `+` as a space. */
+function decoderOf(t) {
+  return t.group === 'query' ? decodeQueryPart : safeDecode;
+}
+
+function layersOf(t) {
+  return peel(t.raw, decoderOf(t));
+}
+
+function plainOf(t) {
+  return plainText(t.raw, decoderOf(t));
+}
+
 /** The draft row a token belongs to, for rowStatus and the edit functions. */
 function rowOf(t) {
   if (t.role === 'seg') return { kind: 'segment', row: draft.work.segments[t.index] };
@@ -160,7 +175,8 @@ function renderBar() {
       sect.append(el('span', `r-${t.role}`, t.raw));
       continue;
     }
-    const part = el('span', `pt r-${t.role}`, decodedView ? t.text : t.raw);
+    const shown = t.role === 'hash' ? `#${t.text}` : t.text;
+    const part = el('span', `pt r-${t.role}`, decodedView ? shown : t.raw);
     part.dataset.id = t.id;
     part.dataset.fk = `pt:${t.id}`;
     part.setAttribute('role', 'button');
@@ -232,7 +248,7 @@ function rowActions(t, canPeel, canDelete) {
 /** A clickable field in a drawer row: editable parts type over, others just select. */
 function field(t, className) {
   const editable = isEditable(t);
-  const span = el('span', `${className}${editable ? '' : ' ro'}`, t.role === 'key' ? t.text : plainText(t.raw));
+  const span = el('span', `${className}${editable ? '' : ' ro'}`, t.role === 'key' ? t.text : plainOf(t));
   if (editable) {
     span.dataset.edit = t.id;
     span.dataset.fk = `ed:${t.id}`;
@@ -243,8 +259,8 @@ function field(t, className) {
   return span;
 }
 
-function badge(raw) {
-  const kind = badgeFor(raw);
+function badge(t) {
+  const kind = badgeFor(t.raw, decoderOf(t));
   if (!kind) return null;
   const b = el('span', `badge ${kind}`, kind === 'encoded' ? '%' : kind);
   b.title = { encoded: 'percent-encoded', url: 'a URL inside the value', base64: 'base64', json: 'JSON', jwt: 'a JWT' }[kind];
@@ -257,9 +273,9 @@ function simpleRow(t, n) {
   if (statusOf(t) !== 'unchanged') row.classList.add('changed');
   if (activeId === t.id) row.classList.add('on');
   row.append(el('span', 'n', String(n)), field(t, `v${t.role === 'seg' ? ' seg' : ''}`));
-  const b = badge(t.raw);
+  const b = badge(t);
   if (b) row.append(b);
-  row.append(rowActions(t, peel(t.raw).length > 1, t.role === 'seg'));
+  row.append(rowActions(t, layersOf(t).length > 1, t.role === 'seg'));
   return [row, peelId === t.id ? peelBox(t) : null];
 }
 
@@ -273,12 +289,12 @@ function paramRow(index, n) {
   row.append(el('span', 'n', String(n)), field(key, 'k'));
   if (val) {
     row.append(el('span', 'eq', '='), field(val, 'v'));
-    const b = badge(val.raw);
+    const b = badge(val);
     if (b) row.append(b);
   } else {
     row.append(el('span', 'eq none', 'no value'), el('span', 'v'));
   }
-  row.append(rowActions(t, !!(val && peel(val.raw).length > 1), true));
+  row.append(rowActions(t, !!(val && layersOf(val).length > 1), true));
   return [row, val && peelId === val.id ? peelBox(val) : null];
 }
 
@@ -297,7 +313,7 @@ function ghostRow(removed) {
 }
 
 function peelBox(t) {
-  const layers = peel(t.raw);
+  const layers = layersOf(t);
   const box = el('div', 'peelbox');
   layers.forEach((layer, i) => {
     const lbl = el('div', 'lbl', layer.label);
@@ -361,6 +377,11 @@ function renderDrawer() {
   copyPlain.setAttribute('aria-label', `Copy the ${SECTION_NAME[openSection]} section decoded`);
   head.append(copyRaw, copyPlain);
   if (openSection === 'query') {
+    const copyJson = el('button', 'btn btn-sm', '{} Copy All');
+    copyJson.type = 'button';
+    copyJson.dataset.sec = 'copy-json';
+    copyJson.setAttribute('aria-label', 'Copy every path segment and parameter as JSON');
+    head.append(copyJson);
     const clear = el('button', 'btn btn-sm btn-danger', 'Clear');
     clear.type = 'button';
     clear.dataset.sec = 'clear';
@@ -440,7 +461,7 @@ function commitEdit(t, text) {
  * input with its decoded text pre-selected. Enter commits, Escape cancels,
  * blur commits; Ctrl+Enter commits and applies.
  */
-function editPart(id, where, { then } = {}) {
+function editPart(id, where, { then, initial, cancel } = {}) {
   const t = tokenById(id);
   if (!t || !isEditable(t)) return;
   if (editing) editing.finish(true);
@@ -451,7 +472,7 @@ function editPart(id, where, { then } = {}) {
 
   const input = el('input', 'type-over');
   input.type = 'text';
-  input.value = t.text;
+  input.value = initial ?? t.text;
   input.size = Math.max(4, Math.min(80, input.value.length + 1));
   input.setAttribute('aria-label', `Edit ${describe(t)}`);
   input.dataset.fk = host.dataset.fk;
@@ -464,11 +485,13 @@ function editPart(id, where, { then } = {}) {
     if (done) return;
     done = true;
     editing = null;
-    const staged = ok && commitEdit(t, input.value);
+    const cancelled = !!cancel && (!ok || input.value.trim() === '');
+    if (cancelled) cancel();
+    const staged = !cancelled && ok && commitEdit(t, input.value);
     if (defer) scheduleRender(focusKey); else render(focusKey);
     if (staged && apply) applyDraft('current');
     // Only Enter carries on to the next step; clicking away means away.
-    if (ok && chain && then) then(staged);
+    if (!cancelled && ok && chain && then) then(staged);
   };
   editing = { finish };
 
@@ -508,18 +531,20 @@ function copySection(mode) {
   const range = groupRange(tok.tokens, openSection);
   if (!range) { showError('Nothing to copy.'); return; }
   if (mode === 'copy') { copyToClipboard(tok.text.slice(range.start, range.end)); return; }
+  if (mode === 'copy-json') { copyToClipboard(JSON.stringify(toJson(draft.work), null, 2)); return; }
   // The section as it reads, not as it is written: every part decoded,
   // punctuation left alone.
   copyToClipboard(tok.tokens
     .filter(t => t.group === openSection)
-    .map(t => (isPunct(t.role) ? t.raw : plainText(t.raw)))
+    .map(t => (isPunct(t.role) ? t.raw : plainOf(t)))
     .join(''));
 }
 
 /**
  * + param: a `key=value` placeholder is staged at the end of the query and
- * the drawer opens with its name armed for typing; committing the name arms
- * the value.
+ * the drawer opens with an empty name armed for typing; committing the name
+ * arms the value. Escaping, or leaving the name empty, takes the placeholder
+ * back out, so nothing is staged.
  */
 function addParamFlow() {
   const result = addParam(draft, 'key', 'value');
@@ -530,6 +555,8 @@ function addParamFlow() {
   activeId = `key-${index}`;
   render();
   editPart(`key-${index}`, 'drawer', {
+    initial: '',
+    cancel: () => { discardAdded(draft, index); activeId = null; },
     then: () => { activeId = `val-${index}`; render(); editPart(`val-${index}`, 'drawer'); },
   });
 }
@@ -639,7 +666,7 @@ function bindDrawer() {
     const t = tokenById(btn.dataset.id);
     if (!t) return;
     if (name === 'copy') copyToClipboard(t.raw);
-    else if (name === 'copy-plain') copyToClipboard(plainText(t.raw));
+    else if (name === 'copy-plain') copyToClipboard(plainOf(t));
     else if (name === 'del') deletePart(t, 'drawer');
     else if (name === 'peel') { peelId = peelId === t.id ? null : t.id; activeId = t.id; render(`act:peel:${t.id}`); }
     else if (name === 'edit') { activeId = t.id; render(); editPart(t.id, 'drawer'); }

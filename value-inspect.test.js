@@ -8,6 +8,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { peel, badgeFor, plainText } from './value-inspect.js';
+import { safeDecode } from './url-model.js';
 
 const kinds = raw => peel(raw).map(l => l.kind);
 
@@ -105,4 +106,11 @@ test('inline JSON peels to pretty JSON', () => {
 test('an empty value is one empty layer', () => {
   assert.deepEqual(peel(''), [{ kind: 'raw', label: 'as written', text: '', isUrl: false }]);
   assert.equal(badgeFor(''), null);
+});
+
+test('a path segment keeps + as a plus', () => {
+  assert.deepEqual(peel('c++', safeDecode).map(l => l.kind), ['raw']);
+  assert.equal(plainText('c++', safeDecode), 'c++');
+  assert.equal(badgeFor('c++', safeDecode), null);
+  assert.equal(plainText('c%2B%2B%20intro', safeDecode), 'c++ intro');
 });
