@@ -182,7 +182,10 @@ function renderBar() {
       line.append(sect);
     }
     if (isPunct(t.role)) {
-      sect.append(el('span', `r-${t.role}`, t.raw));
+      const punct = el('span', `r-${t.role}`, t.raw);
+      // The scheme is drawn as punctuation, but a host switch can change it.
+      if (t.role === 'scheme' && statusOf(t) !== 'unchanged') punct.classList.add('changed');
+      sect.append(punct);
       continue;
     }
     const shown = t.role === 'hash' ? `#${t.text}` : t.text;
