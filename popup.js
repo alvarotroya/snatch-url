@@ -134,7 +134,7 @@ function rowOf(t) {
 }
 
 function statusOf(t) {
-  if (t.role === 'host' || t.role === 'port') return hostStatus(draft);
+  if (t.role === 'scheme' || t.role === 'host' || t.role === 'port') return hostStatus(draft);
   const r = rowOf(t);
   return r ? rowStatus(draft, r.kind, r.row) : 'unchanged';
 }

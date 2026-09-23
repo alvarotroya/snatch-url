@@ -26,6 +26,7 @@ import {
   deleteEntry,
   addEntry,
   setHost,
+  normalizeHost,
 } from './url-model.js';
 
 /**
@@ -140,8 +141,17 @@ export function editKey(draft, index, text) {
   return setKey(draft.work, index, text);
 }
 
-/** setHost on the working copy; a host switch from a group lands here too. */
+/**
+ * setHost on the working copy; a host switch from a group lands here too. A
+ * host with no scheme takes the tab's, not the working copy's, so switching to
+ * `http://localhost:3000` and back restores the tab's URL.
+ */
 export function editHost(draft, text) {
+  const checked = normalizeHost(text);
+  const { protocol } = new URL(draft.base.href);
+  if (checked.ok && !checked.scheme && /^https?:$/.test(protocol)) {
+    return setHost(draft.work, `${protocol}//${checked.host}`);
+  }
   return setHost(draft.work, text);
 }
 

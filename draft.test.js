@@ -111,6 +111,17 @@ test('switching the host back clears the change', () => {
   assert.equal(isDirty(draft), false);
 });
 
+test('a host with no scheme takes the tab scheme after a switch that set one', () => {
+  const draft = fresh();
+  editHost(draft, 'http://localhost:3000');
+  assert.equal(draftUrl(draft), 'http://localhost:3000/docs/guide?q=hello%20world&debug&tag=a');
+
+  assert.deepEqual(editHost(draft, 'example.com'), { ok: true });
+  assert.equal(draftUrl(draft), URL_UNDER_TEST);
+  assert.equal(hostStatus(draft), 'unchanged');
+  assert.equal(isDirty(draft), false);
+});
+
 test('a rejected host leaves the draft clean', () => {
   const draft = fresh();
   assert.equal(editHost(draft, 'not a host').ok, false);

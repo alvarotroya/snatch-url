@@ -377,8 +377,7 @@ export function setHost(model, text) {
   u.port = wanted.port;
   if (u.protocol !== scheme || u.hostname !== wanted.hostname || u.port !== wanted.port) return reject(BAD_HOST);
   const userinfo = parts.filter(p => p.role === 'userinfo').map(p => p.raw).join('');
-  const schemeRaw = scheme === parts[0].raw.slice(0, -2).toLowerCase() ? parts[0].raw : u.protocol + '//';
-  model.prefix = schemeRaw + userinfo + u.host;
+  model.prefix = u.protocol + '//' + userinfo + u.host;
   model.href = u.href;
   return OK;
 }
