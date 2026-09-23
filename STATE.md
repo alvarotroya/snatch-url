@@ -14,9 +14,9 @@ review left a question open; each is his to change.
 
 A Manifest V3 popup for Chrome, Edge and Firefox, 800 pixels wide on a desktop and fluid below
 that, that shows the current tab's URL as one coloured line with a button per part, a strip of
-section cells (host, path, query, fragment) and a drawer per section. Click a part to type over it; copy, decode, delete and restore from the
-drawer; ⚡ Clean strips tracking parameters. Nothing navigates until Apply. `README.md` → *What it
-does today* has the full list and the keyboard map.
+section cells (host, path, query, fragment) and a drawer per section. Click a part to type over
+it; copy, decode, delete and restore from the drawer; ⚡ Clean strips tracking parameters. Nothing
+navigates until Apply. `README.md` → *What it does today* has the full list and the keyboard map.
 
 Health: `npm test` → 128 tests, all passing, across `url-model`, `url-tokens`, `value-inspect` and
 `draft`. Permissions are `activeTab` only. No build step, no dependencies.
