@@ -27,7 +27,7 @@ const SAMPLES = {
 // short and typical URLs' hosts each have a stand-in; the monster's has none.
 const SAMPLE_SETTINGS = {
   groups: [
-    ['example.com', 'example-demo.com', 'localhost:3000'],
+    ['example.com', 'example-demo.com', 'http://localhost:3000'],
     ['shop.example.com:8443', 'shop-demo.example.com:8443'],
   ],
 };

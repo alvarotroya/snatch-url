@@ -49,7 +49,9 @@ group per line: `example.com, example-demo.com, localhost:3000`. When the tab is
 from a group, the host cell gains a **⇄ switch** dropdown of the group's other hosts;
 picking one stages the switch like any other edit, and Apply goes there. A host that is in
 no group changes nothing in the bar. Hosts are written the way the address bar shows them,
-port included, so `localhost:3000` and `localhost:4000` are two hosts.
+port included, so `localhost:3000` and `localhost:4000` are two hosts. A host may carry a
+scheme, `http://localhost:3000`: switching to it sets that scheme too, where a bare host keeps
+the tab's.
 
 **⚡ Clean** strips the usual tracking parameters (`utm_*`, `fbclid`, `gclid` and
 friends; the list is `TRACKING_KEY` in `draft.js`). **+ param** adds a `key=value`

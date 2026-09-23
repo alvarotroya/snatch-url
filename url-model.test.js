@@ -24,6 +24,7 @@ import {
   originParts,
   hostOf,
   normalizeHost,
+  isHostOf,
   setHost,
   BLANK_KEY,
   BLANK_SEGMENT,
@@ -421,7 +422,9 @@ test('setHost refuses what is not a host and leaves the model alone', () => {
     ['', BLANK_HOST],
     ['   ', BLANK_HOST],
     ['a/b', BAD_HOST],
-    ['https://x.io', BAD_HOST],
+    ['ftp://x.io', BAD_HOST],
+    ['https://x.io/', BAD_HOST],
+    ['https://', BAD_HOST],
     ['user@host', BAD_HOST],
     ['host?x=1', BAD_HOST],
     ['host#frag', BAD_HOST],
@@ -448,11 +451,53 @@ test('hostOf is the host with its port and nothing else', () => {
 });
 
 test('normalizeHost accepts a host, with or without a port, and rejects more than that', () => {
-  assert.deepEqual(normalizeHost('Example.com'), { ok: true, host: 'example.com' });
-  assert.deepEqual(normalizeHost('localhost:3000'), { ok: true, host: 'localhost:3000' });
-  assert.deepEqual(normalizeHost('[::1]:8080'), { ok: true, host: '[::1]:8080' });
-  assert.deepEqual(normalizeHost('bücher.de'), { ok: true, host: 'xn--bcher-kva.de' });
+  const host = (h, scheme = '') => ({ ok: true, scheme, host: h, text: (scheme ? scheme + '//' : '') + h });
+  assert.deepEqual(normalizeHost('Example.com'), host('example.com'));
+  assert.deepEqual(normalizeHost('localhost:3000'), host('localhost:3000'));
+  assert.deepEqual(normalizeHost('[::1]:8080'), host('[::1]:8080'));
+  assert.deepEqual(normalizeHost('bücher.de'), host('xn--bcher-kva.de'));
   assert.equal(normalizeHost('').ok, false);
-  assert.equal(normalizeHost('https://example.com').ok, false);
+  assert.equal(normalizeHost('ftp://example.com').ok, false);
   assert.equal(normalizeHost('example.com/path').ok, false);
+});
+
+test('normalizeHost keeps a written default port unless a scheme makes it the default', () => {
+  assert.equal(normalizeHost('example.com:80').text, 'example.com:80');
+  assert.equal(normalizeHost('example.com:443').text, 'example.com:443');
+  assert.deepEqual(normalizeHost('HTTP://LocalHost:3000'), { ok: true, scheme: 'http:', host: 'localhost:3000', text: 'http://localhost:3000' });
+  assert.equal(normalizeHost('https://example.com:443').text, 'https://example.com');
+  assert.equal(normalizeHost('http://example.com:443').text, 'http://example.com:443');
+});
+
+test('isHostOf compares under the URL scheme, and a written scheme must agree', () => {
+  const https = parseUrl('https://example.com/p');
+  assert.equal(isHostOf(https, 'example.com'), true);
+  assert.equal(isHostOf(https, 'EXAMPLE.com'), true);
+  assert.equal(isHostOf(https, 'example.com:443'), true);
+  assert.equal(isHostOf(https, 'example.com:80'), false);
+  assert.equal(isHostOf(https, 'https://example.com'), true);
+  assert.equal(isHostOf(https, 'http://example.com'), false);
+  assert.equal(isHostOf(parseUrl('http://example.com/p'), 'example.com:80'), true);
+  assert.equal(isHostOf(parseUrl('http://localhost:3000/'), 'http://localhost:3000'), true);
+  assert.equal(isHostOf(parseUrl('https://example.com:8443/'), 'example.com'), false);
+  assert.equal(isHostOf(parseUrl('mailto:someone@example.com'), 'example.com'), false);
+  assert.equal(isHostOf(https, 'not a host'), false);
+});
+
+test('setHost with a scheme sets the scheme too; without one the scheme is kept', () => {
+  assert.equal(edit('https://example.com/p?x=1#f', m => setHost(m, 'http://localhost:3000')), 'http://localhost:3000/p?x=1#f');
+  assert.equal(edit('http://localhost:3000/p', m => setHost(m, 'https://example.com')), 'https://example.com/p');
+  assert.equal(edit('https://user:pw@example.com/p', m => setHost(m, 'http://localhost:3000')), 'http://user:pw@localhost:3000/p');
+  assert.equal(edit('https://example.com/p', m => setHost(m, 'https://example-demo.com:443')), 'https://example-demo.com/p');
+  assert.equal(edit('https://example.com/p', m => setHost(m, 'localhost:3000')), 'https://localhost:3000/p');
+  const model = parseUrl('https://example.com/p');
+  setHost(model, 'http://localhost:3000');
+  assert.equal(hostOf(model), 'localhost:3000');
+  assert.equal(originParts(model)[0].raw, 'http://');
+});
+
+test('setHost refuses a scheme a file URL cannot switch to', () => {
+  const model = parseUrl('file:///tmp/notes.txt');
+  assert.deepEqual(setHost(model, 'https://example.com'), { ok: false, error: BAD_HOST });
+  assert.equal(buildUrl(model), 'file:///tmp/notes.txt');
 });

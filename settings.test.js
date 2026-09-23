@@ -19,34 +19,47 @@ import {
   loadSettings,
   saveSettings,
 } from './settings.js';
+import { parseUrl } from './url-model.js';
 
 const GROUPS = [
-  ['example.com', 'example-demo.com', 'localhost:3000'],
+  ['example.com', 'example-demo.com', 'http://localhost:3000'],
   ['shop.example.com:8443', 'shop-demo.example.com:8443'],
 ];
 
+const at = url => parseUrl(url);
+
 // --- The text form ---
 
-test('parseGroups reads one group per line, hosts split by commas or spaces', () => {
+test('parseGroups reads one group per line, hosts split by commas', () => {
   const { groups, errors } = parseGroups(
-    'example.com, example-demo.com localhost:3000\n\n  shop.example.com:8443 ,shop-demo.example.com:8443  \n'
+    'example.com, example-demo.com,HTTP://localhost:3000,\n\n  shop.example.com:8443 ,shop-demo.example.com:8443  \n'
   );
   assert.deepEqual(groups, GROUPS);
   assert.deepEqual(errors, []);
 });
 
-test('parseGroups normalises hosts and ignores comments and repeats', () => {
-  const { groups, errors } = parseGroups('# staging\nExample.COM, example.com, EXAMPLE-demo.com # same as prod\n');
+test('parseGroups normalises hosts and ignores repeats', () => {
+  const { groups, errors } = parseGroups('Example.COM, example.com, EXAMPLE-demo.com\n');
   assert.deepEqual(groups, [['example.com', 'example-demo.com']]);
   assert.deepEqual(errors, []);
 });
 
+test('parseGroups takes neither spaces nor # as anything but part of a host', () => {
+  const { groups, errors } = parseGroups('example.com example-demo.com\n# note, a.com');
+  assert.deepEqual(groups, []);
+  assert.deepEqual(errors.map(e => [e.line, e.text]), [
+    [1, 'example.com example-demo.com'],
+    [2, '# note'],
+    [2, 'a.com'],
+  ]);
+});
+
 test('parseGroups reports what is not a host, with its line', () => {
-  const { groups, errors } = parseGroups('example.com, https://example-demo.com\nlocalhost:3000, localhost:4000');
+  const { groups, errors } = parseGroups('example.com, ftp://example-demo.com\nlocalhost:3000, localhost:4000');
   assert.deepEqual(groups, [['localhost:3000', 'localhost:4000']]);
   assert.equal(errors.length, 2);
   assert.equal(errors[0].line, 1);
-  assert.equal(errors[0].text, 'https://example-demo.com');
+  assert.equal(errors[0].text, 'ftp://example-demo.com');
   assert.equal(errors[1].line, 1);
   assert.equal(errors[1].text, 'example.com');
   assert.match(errors[1].error, /at least two/);
@@ -61,7 +74,7 @@ test('a line with one host is an error, not a group', () => {
 
 test('formatGroups and parseGroups round trip', () => {
   const text = formatGroups(GROUPS);
-  assert.equal(text, 'example.com, example-demo.com, localhost:3000\nshop.example.com:8443, shop-demo.example.com:8443');
+  assert.equal(text, 'example.com, example-demo.com, http://localhost:3000\nshop.example.com:8443, shop-demo.example.com:8443');
   assert.deepEqual(parseGroups(text).groups, GROUPS);
   assert.equal(formatGroups([]), '');
 });
@@ -85,20 +98,33 @@ test('the defaults have no groups and are frozen', () => {
 
 // --- Lookups ---
 
-test('groupOf finds the group a host is in, case-insensitively, port and all', () => {
-  assert.deepEqual(groupOf(GROUPS, 'example-demo.com'), GROUPS[0]);
-  assert.deepEqual(groupOf(GROUPS, 'EXAMPLE.com'), GROUPS[0]);
-  assert.deepEqual(groupOf(GROUPS, 'shop.example.com:8443'), GROUPS[1]);
-  assert.equal(groupOf(GROUPS, 'shop.example.com'), null);
-  assert.equal(groupOf(GROUPS, 'other.com'), null);
-  assert.equal(groupOf(GROUPS, ''), null);
-  assert.equal(groupOf([], 'example.com'), null);
+test('groupOf finds the group a tab is in, port and all', () => {
+  assert.deepEqual(groupOf(GROUPS, at('https://example-demo.com/p')), GROUPS[0]);
+  assert.deepEqual(groupOf(GROUPS, at('https://EXAMPLE.com/p')), GROUPS[0]);
+  assert.deepEqual(groupOf(GROUPS, at('https://shop.example.com:8443/p')), GROUPS[1]);
+  assert.equal(groupOf(GROUPS, at('https://shop.example.com/p')), null);
+  assert.equal(groupOf(GROUPS, at('https://other.com/p')), null);
+  assert.equal(groupOf(GROUPS, at('mailto:someone@example.com')), null);
+  assert.equal(groupOf([], at('https://example.com/')), null);
+});
+
+test('a host written with a scheme matches only that scheme', () => {
+  assert.deepEqual(groupOf(GROUPS, at('http://localhost:3000/')), GROUPS[0]);
+  assert.equal(groupOf(GROUPS, at('https://localhost:3000/')), null);
+});
+
+test('a written default port matches the tab on that default port', () => {
+  const groups = [['example.com:443', 'staging.example.com:443'], ['a.com:80', 'b.com:80']];
+  assert.deepEqual(groupOf(groups, at('https://example.com/')), groups[0]);
+  assert.deepEqual(alternatives(groups, at('https://example.com/')), ['staging.example.com:443']);
+  assert.deepEqual(groupOf(groups, at('http://a.com/')), groups[1]);
+  assert.equal(groupOf(groups, at('https://a.com/')), null);
 });
 
 test('alternatives are the rest of the group, in order', () => {
-  assert.deepEqual(alternatives(GROUPS, 'example-demo.com'), ['example.com', 'localhost:3000']);
-  assert.deepEqual(alternatives(GROUPS, 'localhost:3000'), ['example.com', 'example-demo.com']);
-  assert.deepEqual(alternatives(GROUPS, 'other.com'), []);
+  assert.deepEqual(alternatives(GROUPS, at('https://example-demo.com/')), ['example.com', 'http://localhost:3000']);
+  assert.deepEqual(alternatives(GROUPS, at('http://localhost:3000/')), ['example.com', 'example-demo.com']);
+  assert.deepEqual(alternatives(GROUPS, at('https://other.com/')), []);
 });
 
 // --- Storage ---
@@ -146,6 +172,30 @@ test('local is used when sync errors', async () => {
   const { chrome, stores } = fakeChrome({ syncFails: true });
   assert.equal(await saveSettings(chrome, { groups: GROUPS }), 'local');
   assert.deepEqual(stores.sync, {});
+  assert.deepEqual(await loadSettings(chrome), { groups: GROUPS });
+});
+
+test('settings saved to local after sync refuses the write are the ones loaded', async () => {
+  const stores = { sync: { [STORAGE_KEY]: { groups: [['old.com', 'older.com']] } }, local: {} };
+  const chrome = { runtime: {}, storage: {} };
+  const area = store => ({
+    get(key, cb) { cb(key in store ? { [key]: store[key] } : {}); },
+    set(items, cb) { Object.assign(store, items); cb(); },
+    remove(key, cb) { delete store[key]; cb(); },
+  });
+  chrome.storage.sync = {
+    ...area(stores.sync),
+    set(_items, cb) { chrome.runtime.lastError = { message: 'QUOTA_BYTES_PER_ITEM quota exceeded' }; cb(); chrome.runtime.lastError = undefined; },
+  };
+  chrome.storage.local = area(stores.local);
+  assert.equal(await saveSettings(chrome, { groups: GROUPS }), 'local');
+  assert.deepEqual(stores.sync, {});
+  assert.deepEqual(await loadSettings(chrome), { groups: GROUPS });
+});
+
+test('local is read when sync answers with nothing', async () => {
+  const { chrome, stores } = fakeChrome();
+  stores.local[STORAGE_KEY] = { groups: GROUPS };
   assert.deepEqual(await loadSettings(chrome), { groups: GROUPS });
 });
 

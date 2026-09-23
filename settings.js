@@ -1,8 +1,10 @@
 // Snatch URL - settings.js
 //
 // The owner's settings: host groups. A group is a list of hosts that stand
-// in for each other - `example.com`, `example-demo.com`, `localhost:3000` -
-// so that when the tab is on one of them the popup can offer the others.
+// in for each other - `example.com`, `example-demo.com`,
+// `http://localhost:3000` - so that when the tab is on one of them the popup
+// can offer the others. A host may carry a scheme; switching to it then
+// switches the scheme too.
 //
 // The first half is pure: the options page's text form of the groups, and
 // the lookups the popup makes. The second half is storage: settings live in
@@ -12,7 +14,7 @@
 // in rather than read from the global, so the tests and the demo can hand
 // over a fake one.
 
-import { normalizeHost } from './url-model.js';
+import { normalizeHost, isHostOf } from './url-model.js';
 
 /** @typedef {{groups: string[][]}} Settings */
 
@@ -23,8 +25,8 @@ export const STORAGE_KEY = 'settings';
 
 // --- The text form ---
 //
-// One group per line, hosts separated by commas or whitespace; a `#` starts
-// a comment. That is the whole grammar, so the options page is one textarea.
+// One group per line, hosts separated by commas. That is the whole grammar,
+// so the options page is one textarea.
 
 /**
  * @param {string} text
@@ -34,13 +36,13 @@ export function parseGroups(text) {
   const groups = [];
   const errors = [];
   String(text ?? '').split(/\r?\n/).forEach((line, i) => {
-    const body = line.replace(/#.*$/, '').trim();
-    if (body === '') return;
+    const words = line.split(',').map(w => w.trim()).filter(Boolean);
+    if (words.length === 0) return;
     const hosts = [];
-    for (const word of body.split(/[\s,]+/).filter(Boolean)) {
+    for (const word of words) {
       const checked = normalizeHost(word);
       if (!checked.ok) { errors.push({ line: i + 1, text: word, error: checked.error }); continue; }
-      if (!hosts.includes(checked.host)) hosts.push(checked.host);
+      if (!hosts.includes(checked.text)) hosts.push(checked.text);
     }
     if (hosts.length === 1) errors.push({ line: i + 1, text: hosts[0], error: 'A group needs at least two hosts.' });
     if (hosts.length >= 2) groups.push(hosts);
@@ -67,7 +69,7 @@ export function normalizeSettings(raw) {
     for (const item of entry) {
       if (typeof item !== 'string') continue;
       const checked = normalizeHost(item);
-      if (checked.ok && !hosts.includes(checked.host)) hosts.push(checked.host);
+      if (checked.ok && !hosts.includes(checked.text)) hosts.push(checked.text);
     }
     if (hosts.length >= 2) groups.push(hosts);
   }
@@ -76,32 +78,29 @@ export function normalizeSettings(raw) {
 
 // --- Lookups ---
 
-function sameHost(a, b) {
-  return a.toLowerCase() === b.toLowerCase();
-}
-
 /**
- * The first group a host belongs to, or null. Hosts compare the way the
- * address bar shows them: `example.com:8443` and `example.com` are different.
+ * The first group the model's host belongs to, or null. Hosts compare the
+ * way the address bar shows them, under the URL's scheme: `example.com:8443`
+ * and `example.com` are different, `example.com:443` on https is not, and a
+ * host written with a scheme matches only that scheme.
  * @param {string[][]} groups
- * @param {string} host
+ * @param {import('./url-model.js').UrlModel} model
  * @returns {string[]|null}
  */
-export function groupOf(groups, host) {
-  if (!host) return null;
-  return groups.find(hosts => hosts.some(h => sameHost(h, host))) ?? null;
+export function groupOf(groups, model) {
+  return groups.find(hosts => hosts.some(h => isHostOf(model, h))) ?? null;
 }
 
 /**
- * The hosts a host can be switched to: the rest of its group, in the
- * group's order. Empty when the host is in no group.
+ * The hosts the model's host can be switched to: the rest of its group, in
+ * the group's order. Empty when the host is in no group.
  * @param {string[][]} groups
- * @param {string} host
+ * @param {import('./url-model.js').UrlModel} model
  * @returns {string[]}
  */
-export function alternatives(groups, host) {
-  const group = groupOf(groups, host);
-  return group ? group.filter(h => !sameHost(h, host)) : [];
+export function alternatives(groups, model) {
+  const group = groupOf(groups, model);
+  return group ? group.filter(h => !isHostOf(model, h)) : [];
 }
 
 // --- Storage ---
@@ -134,8 +133,8 @@ function call(chrome, area, method, ...args) {
 
 /**
  * Read the settings. Sync is tried first; when it errors - Firefox reports
- * sync as unavailable this way rather than by leaving it undefined - local
- * is read instead. Never rejects: unreadable settings are the defaults.
+ * sync as unavailable this way rather than by leaving it undefined - or holds
+ * none, local is read instead. Never rejects: unreadable settings are the defaults.
  *
  * @param {object} chrome
  * @returns {Promise<Settings>}
@@ -148,7 +147,7 @@ export async function loadSettings(chrome) {
   for (const a of areas) {
     try {
       const result = await call(chrome, a, 'get', STORAGE_KEY);
-      return normalizeSettings(result && result[STORAGE_KEY]);
+      if (result && result[STORAGE_KEY] !== undefined) return normalizeSettings(result[STORAGE_KEY]);
     } catch {
       // Try the next area.
     }
@@ -157,9 +156,10 @@ export async function loadSettings(chrome) {
 }
 
 /**
- * Write the settings, to sync when it takes them and to local otherwise.
- * Resolves to the name of the area that kept them; rejects only when neither
- * would.
+ * Write the settings, to sync when it takes them and to local otherwise - a
+ * sync that refuses the write (its quota, say) counts as not taking them, and
+ * then sync's older copy is removed so it cannot hide the local one. Resolves
+ * to the name of the area that kept them; rejects only when neither would.
  *
  * @param {object} chrome
  * @param {Settings} settings
@@ -175,6 +175,7 @@ export async function saveSettings(chrome, settings) {
   for (const [name, a] of candidates) {
     try {
       await call(chrome, a, 'set', { [STORAGE_KEY]: clean });
+      if (a !== area) await call(chrome, area, 'remove', STORAGE_KEY).catch(() => {});
       return name;
     } catch (e) {
       lastError = e;

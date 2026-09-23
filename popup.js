@@ -141,7 +141,7 @@ function statusOf(t) {
 
 /** The hosts the current host can be switched to: the rest of its group. */
 function otherHosts() {
-  return alternatives(settings.groups, hostOf(draft.work));
+  return alternatives(settings.groups, draft.work);
 }
 
 /** The parameter a key or value token belongs to: `key`, `val` (or null). */

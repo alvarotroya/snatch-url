@@ -72,7 +72,8 @@ owner can change any of them after trying it:
     has `setHost`, but the bar offers the host only through the ⇄ switch of a configured group (the
     owner's ask), not as a free type-over. Both parts open their section, and copy.
 11. **Host groups are a textarea, one group per line** (`example.com, example-demo.com,
-    localhost:3000`), hosts written the way the address bar shows them, port included. The first
+    http://localhost:3000`), hosts written the way the address bar shows them, port included; a
+    host with a scheme sets it on a switch, a bare host keeps the tab's. The first
     option of the switch is a label, so picking a host is an action and the control reads "switch"
     again once the change is staged; a host in no group changes nothing in the bar.
 
@@ -87,8 +88,7 @@ owner can change any of them after trying it:
 4. **Reorder.** Needs `moveSegment` / `moveEntry` and a `moved` status in `draft.js` first.
 5. **Whether the Clean list is editable**, and paste-any-URL: the "smarter functions" from question
    4 still not built. The settings page is the natural home for an editable Clean list. Host groups
-   could also grow: a `chrome.storage.onChanged` listener would let an open popup follow a save, and
-   the switch could carry a scheme (`http://localhost:3000`) if a group ever mixes them.
+   could also grow: a `chrome.storage.onChanged` listener would let an open popup follow a save.
 6. **Firefox at the 600 cap.** Measured in Firefox 140 ESR: the panel follows the 800 body width
    and sizes its height from content (226 shut, 486 with the query drawer open on the monster URL),
    so the shell never reaches the cap. What happens at 600 - whether the drawer scrolls or the panel

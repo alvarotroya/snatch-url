@@ -33,7 +33,8 @@ the popup can restore a rejected input and show the message.
 `setHost` takes `host` or `host:port` as the address bar shows it: a port in the text
 replaces the URL's and no port drops it (`localhost:3000` -> `example.com` must lose the
 3000), so hostname and port are set one by one - the WHATWG `host` setter keeps an old
-port when the text has none. The host is probed under the URL's own scheme, which is what
+port when the text has none. A text led by `http://` or `https://` (a group entry may
+carry one) sets the scheme too; otherwise the host is probed under the URL's own scheme, which is what
 turns `example.com:443` on https into no port and refuses a port on `file:`. `setHost`
 also moves `model.href`, because `originParts` splits the prefix by parsing it.
 
@@ -61,7 +62,8 @@ The Clean list is `TRACKING_KEY` in `draft.js`; Clean stages removals like any d
 ## Settings and host groups
 
 `settings.js` owns the host groups: the textarea grammar (`parseGroups` / `formatGroups`),
-the lookups (`groupOf`, `alternatives`, matched on `hostOf(model)`, which is host plus port)
+the lookups (`groupOf`, `alternatives`, matched by `isHostOf` in `url-model.js` under the tab's
+scheme, so a written `:443` matches an https tab and an entry's own scheme must agree)
 and storage. Storage takes the `chrome` object as an argument so the tests and the demo can
 hand in a fake; it uses `storage.sync` and falls back to `storage.local` when sync is missing
 or errors, which is how Firefox reports sync as unavailable. `options.html` is one textarea

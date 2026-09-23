@@ -73,8 +73,5 @@ async function load() {
 
 $('groups').addEventListener('input', check);
 $('save-btn').addEventListener('click', save);
-document.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'Enter')) { e.preventDefault(); save(); }
-});
 
 load();
