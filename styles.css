@@ -1,292 +1,393 @@
+/* Snatch URL - styles.css
+   The popup as a second address bar: 800 wide (Chrome's measured cap), a
+   few lines tall with the drawer shut. Catppuccin Mocha throughout. */
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* Catppuccin subtext0. The old muted greys (#45475a, #6c7086) were 1.80:1
-     and 3.36:1 on the #1e1e2e background, both under the 4.5:1 AA minimum;
-     this is 7.9:1 and still reads as secondary text (F10). Those two greys
-     survive as borders and as the scrollbar thumb, where no text sits. */
+  --base: #1e1e2e;
+  --mantle: #181825;
+  --crust: #11111b;
+  --surface0: #313244;
+  --surface1: #45475a;
+  --surface2: #585b70;
+  --text: #cdd6f4;
+  /* Catppuccin subtext0: 7.9:1 on --base, so secondary text stays AA (F10).
+     The darker greys survive as borders and scrollbar thumbs only. */
   --muted: #a6adc8;
+  --mauve: #cba6f7;
+  --lavender: #b4befe;
+  --blue: #89b4fa;
+  --green: #a6e3a1;
+  --peach: #fab387;
+  --yellow: #f9e2af;
+  --red: #f38ba8;
+  --teal: #94e2d5;
+  --pink: #f5c2e7;
   --staged: #f9e2af;
+  --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
 }
+
+html, body { height: auto; }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 14px;
-  background: #1e1e2e;
-  color: #cdd6f4;
-  width: 440px;
+  font-size: 13px;
+  background: var(--base);
+  color: var(--text);
+  /* The popup is sized from its document: 800 is the cap Chrome and Firefox
+     both honour, measured in an installed popup (see AGENTS.md). */
+  width: 800px;
+  overflow: hidden;
 }
 
 #app {
+  position: relative;
   display: flex;
   flex-direction: column;
   max-height: 600px;
-}
-
-/* Header */
-header {
-  padding: 12px 16px 10px;
-  background: #181825;
-  border-bottom: 1px solid #313244;
-  flex-shrink: 0;
-}
-
-header h1 {
-  font-size: 14px;
-  font-weight: 600;
-  color: #cba6f7;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-
-.url-bar {
-  font-size: 12px;
-  color: var(--muted);
-  /* The header now carries the whole URL, so let a long one wrap instead of
-     hiding the query and hash behind an ellipsis. */
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  word-break: break-all;
-}
-
-/* Scrollable body */
-#scroll-body {
-  overflow-y: auto;
-  flex: 1;
   min-height: 0;
 }
 
-#scroll-body::-webkit-scrollbar { width: 4px; }
-#scroll-body::-webkit-scrollbar-track { background: transparent; }
-#scroll-body::-webkit-scrollbar-thumb { background: #45475a; border-radius: 2px; }
+/* One colour per role, the same as the review's prototypes. */
+.r-scheme, .r-sep, .r-qmark, .r-eq, .r-amp { color: var(--surface2); }
+.r-host { color: var(--mauve); }
+.r-userinfo, .r-port { color: var(--pink); }
+.r-seg { color: var(--peach); }
+.r-key { color: var(--blue); }
+.r-val { color: var(--green); }
+.r-hash { color: var(--teal); }
 
-/* Sections */
-section {
-  border-bottom: 2px solid #313244;
-}
-
-section:last-child { border-bottom: none; }
-
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 16px;
-  background: #181825;
-  border-bottom: 1px solid #313244;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.section-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: #cba6f7;
-}
-
-.count-badge {
-  font-size: 12px;
-  color: var(--muted);
-  flex: 1;
-}
-
-/* Param rows */
-ul { list-style: none; }
-
-.param-row {
+/* --- Header --- */
+.pop-head {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 12px;
-  border-bottom: 1px solid #313244;
+  padding: 7px 12px 6px;
+  border-bottom: 1px solid var(--surface0);
+  background: var(--mantle);
+  flex-shrink: 0;
+}
+.pop-head h1 {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--mauve);
+}
+.grow { flex: 1; }
+
+/* --- The bar --- */
+.bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 12px 8px;
+  flex-shrink: 0;
+}
+.bar-lock { color: var(--surface2); font-size: 12px; padding-top: 4px; }
+.bar-tools { display: flex; gap: 4px; padding-top: 2px; flex-shrink: 0; }
+
+#url-line {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.75;
+  background: var(--crust);
+  border: 1px solid var(--surface0);
+  border-radius: 8px;
+  padding: 5px 10px;
+  overflow-wrap: anywhere;
+  /* Three lines, then it scrolls. */
+  max-height: 78px;
+  overflow-y: auto;
+}
+#url-line.oneline {
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-height: none;
+}
+#url-line:focus-within { border-color: var(--mauve); }
+
+/* A run of the URL belonging to one section. */
+.sect { border-radius: 4px; padding: 1px 0; }
+.sect.hot { background: rgba(203, 166, 247, 0.12); }
+.sect.on { background: rgba(203, 166, 247, 0.18); box-shadow: inset 0 -2px 0 var(--mauve); }
+
+/* A part: click to type over it. */
+.pt { border-radius: 3px; cursor: pointer; padding: 1px 1px; }
+.pt:hover { background: var(--surface0); }
+.pt.on { background: var(--surface1); box-shadow: inset 0 -2px 0 var(--lavender); }
+.pt.changed { box-shadow: inset 0 -2px 0 var(--staged); }
+.pt.on.changed { box-shadow: inset 0 -2px 0 var(--staged), 0 0 0 1px var(--lavender); }
+/* An empty segment (`/a//b`) still needs something to click. */
+.pt:empty::before { content: '·'; color: var(--surface2); padding: 0 2px; }
+.pt.readonly { cursor: default; }
+
+/* The type-over input, in the bar and in the drawer. */
+input.type-over {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.4;
+  background: var(--surface0);
+  border: none;
+  outline: 1px solid var(--mauve);
+  border-radius: 3px;
+  color: var(--text);
+  padding: 0 3px;
+  min-width: 40px;
+  max-width: 100%;
 }
 
-.param-row:last-child { border-bottom: none; }
-.param-row:hover { background: #242436; }
-
-.path-index {
+/* --- Section strip --- */
+.strip {
+  display: flex;
+  align-items: stretch;
+  padding: 0 12px 8px;
+  flex-shrink: 0;
+}
+.cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--surface0);
+  border-right-width: 0;
+  background: var(--mantle);
+  cursor: pointer;
+  font: inherit;
   font-size: 11px;
   color: var(--muted);
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  width: 16px;
+  white-space: nowrap;
+  max-width: 260px;
+}
+.cell:first-child { border-radius: 6px 0 0 6px; }
+.cell:nth-child(4) { border-radius: 0 6px 6px 0; border-right-width: 1px; }
+.cell:hover { background: var(--surface0); color: var(--text); }
+.cell.on { background: #2b2640; border-color: var(--mauve); color: var(--text); }
+.cell.on + .cell { border-left-color: var(--mauve); }
+.cell.empty { opacity: 0.5; }
+.cell .nm { font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; font-size: 10px; }
+.cell .ct {
+  color: var(--surface2);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cell.on .ct, .cell:hover .ct { color: var(--muted); }
+.cell .cv { color: var(--surface2); font-size: 9px; }
+.cell.on .cv { transform: rotate(180deg); }
+.strip .tools { display: flex; gap: 5px; align-items: center; }
+
+/* --- Drawer --- */
+.drawer {
+  border-top: 1px solid var(--surface0);
+  background: var(--mantle);
+  max-height: 260px;
+  overflow-y: auto;
+  flex-shrink: 1;
+  min-height: 0;
+}
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--surface0);
+  position: sticky;
+  top: 0;
+  background: var(--mantle);
+  z-index: 1;
+}
+.drawer-head .t {
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--mauve);
+  font-weight: 700;
+}
+.drawer-head .sub { font-size: 10.5px; color: var(--muted); flex: 1; }
+
+.drow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-bottom: 1px solid rgba(36, 36, 53, 0.6);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+.drow:hover { background: #242436; }
+.drow.on { background: #2a2a3f; }
+.drow.changed { box-shadow: inset 2px 0 0 var(--staged); }
+.drow .n {
+  width: 18px;
+  color: var(--surface2);
+  font-size: 10px;
   text-align: right;
   flex-shrink: 0;
 }
+.drow .k { color: var(--blue); flex-shrink: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drow .eq { color: var(--surface2); }
+.drow .eq.none { font-size: 10px; font-family: inherit; }
+.drow .v { color: var(--green); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drow .v.seg { color: var(--peach); }
+.drow .v.ro, .drow .k.ro { cursor: default; }
+.drow [data-edit] { border-radius: 3px; padding: 1px 2px; }
+.drow [data-edit]:hover { background: var(--surface0); }
+.drow .acts { display: flex; gap: 2px; opacity: 0; flex-shrink: 0; }
+.drow:hover .acts, .drow.on .acts, .drow:focus-within .acts { opacity: 1; }
+.drow input.type-over { flex: 1; min-width: 0; font-size: 12px; }
 
-.param-key, .param-value {
+/* A staged deletion: still on screen, still restorable (F3). */
+.drow.removed { color: var(--muted); cursor: default; }
+.drow.removed:hover { background: transparent; }
+.drow.removed .gone { flex: 1; min-width: 0; text-decoration: line-through; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drow.removed .acts { opacity: 1; }
+
+.iconb {
   background: transparent;
   border: none;
-  outline: none;
-  color: #cdd6f4;
-  font-size: 13px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  padding: 3px 5px;
-  border-radius: 3px;
-}
-
-.param-key {
-  color: #89b4fa;
-  width: 120px;
-  flex-shrink: 0;
-}
-
-.param-value { flex: 1; color: #a6e3a1; }
-.path-seg { color: #fab387; }
-
-.param-key:focus, .param-value:focus { background: #313244; }
-
-.sep {
   color: var(--muted);
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-/* Add section */
-.add-section {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 16px;
-  border-top: 1px solid #313244;
-  background: #181825;
-  flex-shrink: 0;
-}
-
-.input-key, .input-value {
-  background: #313244;
-  border: 1px solid #45475a;
-  border-radius: 4px;
-  color: #cdd6f4;
-  font-size: 13px;
-  padding: 5px 8px;
-  outline: none;
-}
-
-.input-key { width: 110px; flex-shrink: 0; }
-.input-value { flex: 1; }
-.input-key:focus, .input-value:focus { border-color: #cba6f7; }
-
-/* Buttons */
-.btn {
-  background: #313244;
-  border: 1px solid #45475a;
-  border-radius: 4px;
-  color: #cdd6f4;
   cursor: pointer;
   font-size: 12px;
-  padding: 5px 10px;
-  white-space: nowrap;
-  transition: background 0.1s;
+  padding: 2px 6px;
+  border-radius: 3px;
+  line-height: 1;
+  font-family: inherit;
 }
+.iconb:hover { background: var(--surface0); color: var(--text); }
+.iconb.danger:hover { color: var(--red); }
 
-.btn:hover { background: #45475a; }
-
-.btn-primary {
-  background: #cba6f7;
-  border-color: #cba6f7;
-  color: #1e1e2e;
-  font-weight: 600;
-}
-
-.btn-primary:hover { background: #b4befe; border-color: #b4befe; }
-
-.btn-danger { color: #f38ba8; }
-.btn-danger:hover { background: #3d2a2e; border-color: #f38ba8; }
-
-.btn-icon { padding: 3px 8px; font-size: 14px; border: none; background: transparent; }
-.btn-sm { padding: 4px 9px; }
-
-/* Empty state */
-.empty-state {
-  padding: 12px 16px;
+.peelbox { padding: 7px 12px 10px 42px; background: var(--crust); border-bottom: 1px solid var(--surface0); }
+.peelbox .lbl {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--muted);
-  font-size: 13px;
+  margin: 5px 0 2px;
+  display: flex;
+  gap: 5px;
+  align-items: center;
 }
+.peelbox pre {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  background: var(--base);
+  border-radius: 4px;
+  padding: 5px 7px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 88px;
+  overflow: auto;
+}
+.peelbox pre.last { color: var(--text); }
+.peelbox .peel-tools { display: flex; gap: 5px; margin-top: 7px; }
 
-/* Error */
-.error {
-  padding: 8px 16px;
-  background: #3d2a2e;
-  color: #f38ba8;
-  font-size: 13px;
-  border-top: 1px solid #f38ba8;
+.hint { font-size: 11px; color: var(--muted); padding: 10px 12px; }
+
+/* --- Badges --- */
+.badge {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 3px;
+  padding: 1px 4px;
+  background: var(--surface0);
+  color: var(--muted);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   flex-shrink: 0;
 }
+.badge.encoded { color: var(--yellow); }
+.badge.url { color: var(--teal); }
+.badge.base64, .badge.jwt { color: var(--pink); }
+.badge.json { color: var(--lavender); }
 
-.hidden { display: none !important; }
-
-/* Placeholders inherit a browser grey that is far below AA on this
-   background, so they get the same muted colour as the rest (F10). */
-::placeholder { color: var(--muted); opacity: 1; }
-
-/* Keyboard focus has to be visible now that Tab no longer navigates. */
-:focus-visible { outline: 2px solid #cba6f7; outline-offset: 1px; }
-
-/* --- Staged edits (F3) --- */
-
-/* The header shows the URL the draft WOULD go to, so it has to say when that
-   is not the URL the tab is on. */
-.url-bar.staged {
-  color: var(--staged);
-  border-left: 2px solid var(--staged);
-  padding-left: 6px;
-}
-
-/* A touched row, so unapplied changes are visible without reading the URL. */
-.row-modified, .row-added { box-shadow: inset 2px 0 0 var(--staged); }
-.row-added { background: #2a2a3c; }
-
-.row-removed {
+/* --- Keyboard hints --- */
+.keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 10px;
+  padding: 4px 12px;
+  background: var(--crust);
+  border-top: 1px solid var(--surface0);
+  font-size: 10px;
   color: var(--muted);
-  gap: 8px;
+  flex-shrink: 0;
+}
+.keys kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text);
+  background: var(--surface0);
+  border-radius: 3px;
+  padding: 0 4px;
 }
 
-.removed-text {
-  flex: 1;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 13px;
-  text-decoration: line-through;
-  word-break: break-all;
+/* --- Buttons --- */
+.btn {
+  background: var(--surface0);
+  border: 1px solid var(--surface1);
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  padding: 4px 9px;
+  white-space: nowrap;
+  transition: background 0.1s, border-color 0.1s;
 }
+.btn:hover { background: var(--surface1); }
+.btn[aria-pressed="true"] { background: #2b2640; border-color: var(--mauve); }
+.btn-primary { background: var(--mauve); border-color: var(--mauve); color: var(--base); font-weight: 600; }
+.btn-primary:hover { background: var(--lavender); border-color: var(--lavender); }
+.btn-danger { color: var(--red); }
+.btn-danger:hover { background: #3d2a2e; border-color: var(--red); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn:disabled:hover { background: var(--surface0); }
+.btn-primary:disabled:hover { background: var(--mauve); }
 
-/* Status bar: the only place an edit leaves the popup. */
+/* --- Status bar: the only place an edit leaves the popup --- */
 .status-bar {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
-  border-top: 1px solid #313244;
-  background: #181825;
+  padding: 7px 12px;
+  border-top: 1px solid var(--surface0);
+  background: var(--mantle);
   flex-shrink: 0;
 }
+.change-summary { flex: 1; font-size: 11px; color: var(--muted); min-width: 0; }
+.status-bar.dirty .change-summary { color: var(--staged); font-weight: 600; }
 
-.change-summary {
-  flex: 1;
+/* --- Toast: errors and confirmations, floating over the status bar --- */
+.toast {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 42px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  background: #3d2a2e;
+  color: var(--red);
+  border: 1px solid var(--red);
   font-size: 12px;
-  color: var(--muted);
+  z-index: 40;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  overflow-wrap: anywhere;
 }
+.toast.notice { background: #2a3d2e; color: var(--green); border-color: var(--green); }
 
-.status-bar.dirty .change-summary {
-  color: var(--staged);
-  font-weight: 600;
-}
+.hidden { display: none !important; }
 
-.btn:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
+::placeholder { color: var(--muted); opacity: 1; }
+:focus-visible { outline: 2px solid var(--mauve); outline-offset: 1px; }
 
-.btn:disabled:hover { background: #313244; }
-.btn-primary:disabled:hover { background: #cba6f7; }
-
-/* Toast: the same strip carries errors and confirmations. */
-.error.notice {
-  background: #2a3d2e;
-  color: #a6e3a1;
-  border-top-color: #a6e3a1;
-}
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface1); border-radius: 3px; }

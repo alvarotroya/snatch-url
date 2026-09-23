@@ -170,6 +170,30 @@ export function clearQuery(draft) {
 }
 
 /**
+ * Query parameters a URL is usually better off without: the tracking tags
+ * marketing tools append. Clean strips exactly these, by name, and nothing
+ * else. One list, so the popup and the tests agree on it.
+ */
+export const TRACKING_KEY =
+  /^(utm_|fbclid$|gclid$|gbraid$|wbraid$|msclkid$|yclid$|igshid$|mc_cid$|mc_eid$|_ga$|_gl$|vero_|mkt_tok$)/i;
+
+/**
+ * Clean, staged: every tracking parameter is removed the way a delete
+ * removes one, so each is restorable and all of them count as changes.
+ *
+ * @returns {{ok: true, count: number}}
+ */
+export function cleanTracking(draft) {
+  const from = draft.removed.length;
+  for (let i = draft.work.entries.length - 1; i >= 0; i -= 1) {
+    if (TRACKING_KEY.test(draft.work.entries[i].key)) removeEntry(draft, i);
+  }
+  const cleared = draft.removed.splice(from).sort((a, b) => a.index - b.index);
+  draft.removed.push(...cleared);
+  return { ok: true, count: cleared.length };
+}
+
+/**
  * Put a staged deletion back where it came from. Later edits may have made
  * the list shorter, so the index is clamped rather than trusted.
  */

@@ -21,6 +21,7 @@ import {
   clearEntries,
   toJson,
   safeDecode,
+  originParts,
   BLANK_KEY,
   BLANK_SEGMENT,
 } from './url-model.js';
@@ -319,4 +320,41 @@ test('toJson leaves a malformed escape as its raw text', () => {
   const json = toJson(parseUrl('https://example.com/files/report%zz.pdf?a=%zz'));
   assert.deepEqual(json.path, ['files', 'report%zz.pdf']);
   assert.deepEqual(plain(json.query), { a: '%zz' });
+});
+
+// --- originParts ---
+
+test('originParts splits the prefix and joins back to it exactly', () => {
+  for (const url of [
+    'https://example.com/p',
+    'https://example.com:8443/p?x=1#frag',
+    'https://user:pw@example.com/p?x=1',
+    'http://[::1]:8080/p',
+    'http://127.0.0.1:8765/docs/guide/',
+  ]) {
+    const model = parseUrl(url);
+    const parts = originParts(model);
+    assert.equal(parts.map(p => p.raw).join(''), model.prefix, url);
+  }
+});
+
+test('originParts names scheme, user info, host and port', () => {
+  assert.deepEqual(originParts(parseUrl('https://user:pw@example.com:8443/p')), [
+    { role: 'scheme', raw: 'https://' },
+    { role: 'userinfo', raw: 'user:pw@' },
+    { role: 'host', raw: 'example.com' },
+    { role: 'port', raw: ':8443' },
+  ]);
+  assert.deepEqual(originParts(parseUrl('https://example.com/p')), [
+    { role: 'scheme', raw: 'https://' },
+    { role: 'host', raw: 'example.com' },
+  ]);
+});
+
+test('originParts falls back to one host part when the pieces do not add up', () => {
+  const model = parseUrl('https://example.com/p');
+  model.prefix = 'something://else';
+  assert.deepEqual(originParts(model), [{ role: 'host', raw: 'something://else' }]);
+  model.href = 'not a url';
+  assert.deepEqual(originParts(model), [{ role: 'host', raw: 'something://else' }]);
 });

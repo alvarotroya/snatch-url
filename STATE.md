@@ -5,17 +5,21 @@ build, test and browser-verification details.
 
 ## Where things stand
 
-**The extension works and is stable. Its next step is a UX redesign, and the captain is choosing the
-direction.** Nothing should be built toward that redesign until he has picked.
+**The UX redesign is built: the popup is prototype E, the second address bar, on the real staging
+layer.** It is in the owner's hands to test, from the installed extension or from the no-install demo
+in [`docs/demo/`](docs/demo/). The defaults listed below were taken from the prototype where the
+review left a question open; each is his to change.
 
 ## What the extension does today
 
-A Manifest V3 popup for Chrome, Edge and Firefox that takes the current tab's URL apart so you can
-edit it: path segments and query parameters as editable rows, each with copy and delete, staged until
-you press Apply or Apply in new tab. No build step, no runtime dependencies, one directory loaded
-unpacked serves all three browsers. `README.md` → *What it does today* has the full feature list.
+A Manifest V3 popup for Chrome, Edge and Firefox, 800 pixels wide, that shows the current tab's URL
+as one coloured line with a button per part, a strip of section cells (host, path, query, fragment)
+and a drawer per section. Click a part to type over it; copy, decode, delete and restore from the
+drawer; ⚡ Clean strips tracking parameters. Nothing navigates until Apply. `README.md` → *What it
+does today* has the full list and the keyboard map.
 
-Health: `npm test` → 71 tests, all passing. Permissions are `activeTab` only.
+Health: `npm test` → 125 tests, all passing, across `url-model`, `url-tokens`, `value-inspect` and
+`draft`. Permissions are `activeTab` only. No build step, no dependencies.
 
 ## What has landed
 
@@ -26,58 +30,70 @@ Health: `npm test` → 71 tests, all passing. Permissions are `activeTab` only.
 | #3 | Fixed popup rendering, copy and error-reporting bugs. |
 | #4 | Runs in Firefox and Edge from the same unpacked directory as Chrome. |
 | #5 | Edits are staged behind an Apply step (`draft.js`), so nothing navigates until you say so; accessibility gaps fixed. |
+| #6 | The UX review: eight working prototypes, findings, and the handover that led here. |
+| #7 | The second address bar (prototype E) built into the popup; `url-tokens.js` and `value-inspect.js` moved in with tests; ⚡ Clean staged in `draft.js`; the no-install demo in `docs/demo/`. |
 
-## In flight: the UX direction
+## Decisions now settled
 
-The captain, after using the extension: *"I'm thinking of a pop up that really allows me feel I'm
-touching that URL with my hands. Copy parts of it, overwrite parts of it, select certain chars
-there, select entire portions."* The row-of-input-boxes popup is what stands between him and that.
+By the owner, in the review and before it:
 
-Eight working prototypes answer it, in [`docs/ux-review/`](docs/ux-review/). Open
-[`docs/ux-review/index.html`](docs/ux-review/index.html) in a browser — no server needed. The
-written findings are in [`docs/ux-review/FINDINGS.md`](docs/ux-review/FINDINGS.md).
+1. **Popup, not side panel**, and **wide**: *"like a secondary adress bar below the real one? Just
+   smarter and with more functions?"* Built at 800, which is the cap measured in an installed popup
+   (Chromium 153: a 900 × 700 document was given exactly 800 × 600; Firefox 140 ESR gives the
+   800 body its 800 and sizes the height from content).
+2. **Horizontal and section-first.** The URL is one line with its parts addressable, not a form.
 
-**Settled so far, by the captain:** it stays a **popup**, not a side panel — but a **wider** one,
-*"like a secondary adress bar below the real one? Just smarter and with more functions?"* That is
-prototype E.
+Taken from prototype E as the default where the review's questions had no owner answer, so the
+owner can change any of them after trying it:
 
-## Decisions that are the captain's
+3. **The action mechanism** (review question 2): click a part to type over it, in the bar or in the
+   drawer; per-row copy / look-inside / delete in the drawer; per-section copy-as-written,
+   copy-decoded and Clear in the drawer head. No hover cards, no fixed action bar, no command bar.
+4. **Sections, not characters, own the mouse** (question 3): a plain click on a part types over it;
+   a click on punctuation or a cell opens the section. A dragged character selection in the bar is
+   left alone, so ⌘C / Ctrl+C still copies exact characters — but there is no typing over an
+   arbitrary character range (that is prototype A's line).
+5. **Encoding happens on commit, not while typing** (question 3, second half): the input holds the
+   decoded text; the model encodes it when the edit is staged. Nothing is rewritten as you type.
+6. **What Copy gives** (question 4): the per-part ⎘ and "Copy section" copy the text *as written*;
+   "Copy decoded" is a separate, labelled action everywhere. A dragged selection copies characters.
+7. **⚡ Clean is one click, not a preview**, and strips E's hard-coded list — now the `TRACKING_KEY`
+   constant in `draft.js`. Everything it removes is a restorable ghost, like any staged deletion.
+8. **Enter commits a type-over; Ctrl+Enter (⌘+Enter) applies.** PR #5's "Enter applies" was for
+   the row form; in the bar, Enter ends the edit. Ctrl+Enter inside an input commits and applies.
+9. **+ param** adds a `key=value` placeholder and arms the name, then (on Enter) the value — E's
+   flow rather than the old key/value form at the bottom.
+10. **Host and fragment are read-only** in the bar: the model has no edit function for either and E
+    only got them "for free" by splicing text. They open their section, and copy.
 
-Do not make these on his behalf. They are the four questions at the end of the review page.
+## Still open
 
-1. **The shell** — how the URL is laid out and how wide the popup is. E, the wide second address bar,
-   is the front-runner because it is his own idea, but he has not confirmed it.
-2. **The action mechanism** — how you act on a part once you have it: a menu, a hover card, a fixed
-   action bar, or typing a command.
-3. **Characters or sections.** Dragging a selection through raw characters and click-selecting
-   coloured sections both want the same mouse gesture. He has asked for both. **This one unblocks the
-   rest.**
-4. **Which "smarter" functions** make the cut — stripping tracking parameters, decoding nested and
-   base64 values, drag to reorder, paste any URL to take it apart, per-site presets.
+1. **Editing the host or the fragment.** Wants `setHost` / `setHash` in `url-model.js` (with
+   `rowStatus` coverage in `draft.js`) before the bar can offer them.
+2. **Character-level type-over.** Selecting characters across parts and typing is prototype A's
+   editable line; the tokeniser it needs is now `url-tokens.js`, so it can be added inside E's shell.
+3. **Re-packing a peeled value.** "Look inside" decodes base64 and JSON for reading; an edit only
+   re-encodes the percent layer, so editing decoded JSON and having it re-packed is not built.
+4. **Reorder.** Needs `moveSegment` / `moveEntry` and a `moved` status in `draft.js` first.
+5. **Whether the Clean list is editable**, and per-site presets, paste-any-URL: the "smarter
+   functions" from question 4 that did not make this first cut.
+6. **Firefox at the 600 cap.** Measured in Firefox 140 ESR: the panel follows the 800 body width
+   and sizes its height from content (226 shut, 486 with the query drawer open on the monster URL),
+   so the shell never reaches the cap. What happens at 600 - whether the drawer scrolls or the panel
+   does - has not been provoked there.
 
 ## Next work, in order
 
-1. **Wait for the captain's pick.** If his answers are not in the repository or the conversation,
-   ask for them. Do not choose.
-2. **Measure the real popup size limit.** Every wide design assumes Chrome's documented 800 × 600
-   cap. Install the extension unpacked (the recipe is in `AGENTS.md`), set `popup.html` to 800px
-   wide, and measure before any layout depends on it. Check Firefox too, where the panel sizes itself
-   from its content.
-3. **Move the URL tokeniser into the extension**, with tests. `docs/ux-review/src/proto-core.js` maps
-   each part of a URL to its exact character range — the one piece every direction needs and no
-   shipped module has. It belongs next to `url-model.js` as `url-tokens.js`.
-4. **Move the value inspector in**, with tests — `peel` and `badgeFor` from the same file, which
-   decode percent, base64, JSON, JWT and nested-URL values.
-5. **Build the chosen shell and action mechanism** in place of the row list in `popup.js`, keeping
-   `applyDraft` as the only thing that navigates.
-
-`docs/ux-review/FINDINGS.md` → *Concrete first ship tasks* has the full list with the detail.
+1. **The owner tests it** — the demo over the tailnet or the installed popup — and answers the
+   defaults above with his hands. Change what he says; do not guess further.
+2. Whatever he asks for from *Still open*, each as its own small PR that keeps the invariants below.
 
 ## Rules that must keep holding
 
-These are easy to break by accident while redesigning. `AGENTS.md` explains each.
+These are easy to break by accident while iterating. `AGENTS.md` explains each.
 
 - `url-model.js` is the only place URLs are parsed and rebuilt; nothing else re-implements it.
-- Only `applyDraft` in `popup.js` navigates.
+  `url-tokens.js` only lays offsets over what the model built.
+- Only `applyDraft` in `popup.js` navigates. Every edit goes through `draft.js`.
 - `activeTab` is the only permission. Adding `tabs` buys nothing and adds a browsing-history warning.
 - No build step, bundler, framework or runtime dependency in the extension itself.

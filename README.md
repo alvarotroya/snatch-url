@@ -1,57 +1,86 @@
 # Snatch URL
 
-A small browser extension that opens the current tab's URL as editable rows: one row
-per path segment, one row per query parameter. Edits are staged until you apply them,
-either to the tab you are on or to a new one. It runs in Chrome, Edge and Firefox from
-the same directory.
+A small browser extension that opens the current tab's URL as a second address bar under
+the real one: the URL on one coloured line, one button per part, a strip of section cells
+(host, path, query, fragment) under it, and a drawer for whichever section you open. Click
+a part to type over it. Edits are staged until you apply them, either to the tab you are
+on or to a new one. It runs in Chrome, Edge and Firefox from the same directory.
 
 It is a prototype, built to work out what the tool should really be. Expect rough
-edges, and expect the UI to change.
+edges, and expect the UI to change. The design is prototype E of the UX review in
+[`docs/ux-review/`](docs/ux-review/); the review's findings say why.
 
 ## What it does today
 
-Click the toolbar icon and the popup reads the active tab's URL.
+Click the toolbar icon and the popup reads the active tab's URL. It is 800 pixels wide,
+Chrome's cap for a popup, so a typical URL fits on one to three lines.
 
-**Path** — one row per segment, in order:
+**The bar.** The URL as it will be navigated to, coloured by role: host, path segments,
+parameter names, parameter values, fragment. Click any path segment, parameter name or
+parameter value and it turns into an input with its decoded text selected, so typing
+replaces it. **Enter** commits, **Escape** cancels, clicking away commits. Nothing you
+did not type is changed: `%20` stays `%20`, `a,b` stays `a,b`, and a part you click but
+do not change is left byte for byte alone. A dragged selection in the bar is yours: copy
+it with the keyboard.
 
-- edit a segment in place
-- copy a segment to the clipboard
-- delete a segment
+- **⎘ URL** copies the whole URL.
+- **decoded** shows every part decoded instead of as written; edits still write proper
+  encoding.
+- **one line** collapses the bar to a single line that scrolls sideways.
 
-**Query** — one row per parameter, in order:
+**The section strip.** One cell each for the host, the path (with its segment count), the
+query (with its parameter count) and the fragment. Click a cell and a drawer opens under
+the bar with one row per part of that section:
 
-- edit a key or a value in place
-- copy a value to the clipboard
-- delete a parameter
-- **Copy All** puts every parameter on the clipboard as a JSON object
-- **Clear All** removes every query parameter
-- the field at the bottom adds a new `key=value` pair (Enter also adds it)
+- click a name or value in a row to type over it, as in the bar
+- **⎘** copies the part as written; a value that hides something - percent-encoding, a
+  nested URL, base64, JSON, a JWT - carries a badge, and **⌄** unfolds it layer by layer,
+  with **Copy decoded** for its most readable form
+- **✕** deletes a segment or a whole parameter
+- **Copy section** and **Copy decoded** in the drawer's header copy the whole section as
+  written or as it reads
+- the query drawer also has **Clear**, which removes every parameter
+
+**⚡ Clean** strips the usual tracking parameters (`utm_*`, `fbclid`, `gclid` and
+friends; the list is `TRACKING_KEY` in `draft.js`). **+ param** adds a `key=value`
+parameter and opens it for typing: the name first, then, on Enter, the value.
 
 **Applying changes.** Nothing touches the tab until you say so. Every edit, deletion
 and addition goes into a draft, and the bar at the bottom says how many changes are
 waiting:
 
-- **Apply** navigates this tab to the draft URL.
+- **Apply** (or **Ctrl+Enter**, **⌘+Enter** on a Mac) navigates this tab to the draft URL.
 - **New tab** opens the draft URL in a new tab and leaves this one where it is.
 - **Revert** throws the whole draft away.
-- Pressing **Enter** in a path or parameter field applies the draft to this tab, so a
-  single edit is still one keystroke. (Enter in the add fields at the bottom adds the
-  parameter, as before - it does not apply.)
 
-While changes are waiting, the header URL turns amber and shows the URL the draft
-would go to, and every row you touched carries an amber bar: edited, added, or - for a
-deleted row - struck through with a **Restore** button. That is also Clear All's undo:
-the parameters it removes stay on screen until you apply, one Restore button each.
+While changes are waiting the count turns amber, every part you touched carries an amber
+underline in the bar and an amber edge in its drawer row, and a deleted part stays in the
+drawer struck through with a **Restore** button. That is also Clear's and Clean's undo:
+the parameters they remove stay on screen until you apply, one Restore each.
 
 An edit the model rejects, such as a blank key or segment, is put back and explained
 rather than staged.
 
-Rebuilding preserves the parts you did not touch: `%20` stays `%20`, `a,b` stays
-`a,b`, a bare `debug` stays bare, and a trailing slash is kept.
+**Keyboard.** Tab reaches one part of the bar; **←** and **→** move between parts, **Enter**
+types over the current one, **Backspace** deletes it, **Alt+←/→** move between parts from
+anywhere, **Escape** closes the drawer.
 
 Because the popup drives the tab it was opened from, it cannot act on the pages a
 browser keeps extensions out of: `chrome://` pages and the Chrome Web Store, or
 `about:` pages and addons.mozilla.org in Firefox.
+
+## Trying it without installing
+
+[`docs/demo/`](docs/demo/) wraps the real popup in a mock browser with a fake tab, so
+the second address bar can be tried in any browser with no extension installed. Serve
+the repository root over HTTP and open `/docs/demo/`:
+
+```sh
+python3 -m http.server 8000
+# then http://localhost:8000/docs/demo/
+```
+
+The page says what the demo cannot show compared with the installed popup.
 
 ## Permissions
 
@@ -129,16 +158,20 @@ not on a run.
 | --- | --- |
 | `manifest.json` | MV3 manifest: the popup, the `activeTab` permission, the Firefox add-on id |
 | `popup.html` | popup markup |
-| `popup.js` | renders the rows and is the only place the tab is navigated |
-| `draft.js` | staging: what is edited, what is deleted, and what is still unapplied |
+| `popup.js` | renders the bar, the strip and the drawer, and is the only place the tab is navigated |
+| `draft.js` | staging: what is edited, what is deleted, and what is still unapplied; the Clean list |
 | `url-model.js` | the one place a URL is parsed and rebuilt |
-| `url-model.test.js`, `draft.test.js` | tests for them |
+| `url-tokens.js` | maps every part of a URL to the characters it occupies, for the bar |
+| `value-inspect.js` | peels a value: percent, nested URL, base64, JSON, JWT |
+| `*.test.js` | tests for the four modules |
 | `styles.css` | popup styling |
+| `docs/demo/` | the popup in a mock browser, for trying it with no install |
+| `docs/ux-review/` | the UX review the design came from |
 | `icon{16,48,128}.png` | toolbar icons, generated by `tools/make-icons.sh` |
 
 No build step and no runtime dependencies: edit the files and reload the extension.
 
-`npm test` runs the URL-model and draft tests with `node --test`, which is built into
+`npm test` runs the module tests with `node --test`, which is built into
 Node, so there is nothing to install first.
 
 ## License
