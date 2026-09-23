@@ -18,7 +18,7 @@ and a drawer per section. Click a part to type over it; copy, decode, delete and
 drawer; ⚡ Clean strips tracking parameters. Nothing navigates until Apply. `README.md` → *What it
 does today* has the full list and the keyboard map.
 
-Health: `npm test` → 125 tests, all passing, across `url-model`, `url-tokens`, `value-inspect` and
+Health: `npm test` → 128 tests, all passing, across `url-model`, `url-tokens`, `value-inspect` and
 `draft`. Permissions are `activeTab` only. No build step, no dependencies.
 
 ## What has landed
@@ -48,7 +48,7 @@ owner can change any of them after trying it:
 
 3. **The action mechanism** (review question 2): click a part to type over it, in the bar or in the
    drawer; per-row copy / look-inside / delete in the drawer; per-section copy-as-written,
-   copy-decoded and Clear in the drawer head. No hover cards, no fixed action bar, no command bar.
+   copy-decoded in the drawer head, plus Copy All (JSON) and Clear for the query. No hover cards, no fixed action bar, no command bar.
 4. **Sections, not characters, own the mouse** (question 3): a plain click on a part types over it;
    a click on punctuation or a cell opens the section. A dragged character selection in the bar is
    left alone, so ⌘C / Ctrl+C still copies exact characters — but there is no typing over an
@@ -62,7 +62,8 @@ owner can change any of them after trying it:
 8. **Enter commits a type-over; Ctrl+Enter (⌘+Enter) applies.** PR #5's "Enter applies" was for
    the row form; in the bar, Enter ends the edit. Ctrl+Enter inside an input commits and applies.
 9. **+ param** adds a `key=value` placeholder and arms the name, then (on Enter) the value — E's
-   flow rather than the old key/value form at the bottom.
+   flow rather than the old key/value form at the bottom. Escape, or an empty name, takes the
+   placeholder back out, so nothing is staged.
 10. **Host and fragment are read-only** in the bar: the model has no edit function for either and E
     only got them "for free" by splicing text. They open their section, and copy.
 
