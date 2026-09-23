@@ -36,8 +36,13 @@ body {
   background: var(--base);
   color: var(--text);
   /* The popup is sized from its document: 800 is the cap Chrome and Firefox
-     both honour, measured in an installed popup (see AGENTS.md). */
+     both honour, measured in an installed popup (see AGENTS.md). The fixed
+     width is what a desktop popup measures its bubble from, so it stays; the
+     percentage cap is ignored by that measurement but shrinks the shell to a
+     narrower viewport (Firefox for Android, the demo on a phone), where the
+     rules at the end of this file take over. */
   width: 800px;
+  max-width: 100%;
   overflow: hidden;
 }
 
@@ -391,3 +396,86 @@ input.type-over {
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--surface1); border-radius: 3px; }
+
+/* --- Narrow viewports ---
+   Everything above is the 800-wide layout and holds unchanged at 800 and up.
+   Below it the shell is fluid: nothing is hidden, the bar wraps or scrolls
+   inside itself, and every control is a 44px tap target with no hover-only
+   action, because the one real mobile host (Firefox for Android) opens the
+   popup full-width on a touch screen. */
+@media (max-width: 799px) {
+  body { overflow: visible; }
+  #app { max-height: none; }
+
+  .pop-head { padding: 6px 12px; }
+  .pop-head h1 { margin-right: 4px; }
+
+  .btn { min-height: 44px; padding: 0 12px; font-size: 12px; }
+  .iconb { min-width: 44px; min-height: 44px; padding: 0 8px; font-size: 14px; }
+
+  /* Each line of the bar is a 44px band, so every part is a full-height target. */
+  #url-line { font-size: 14px; line-height: 44px; padding: 0 8px; max-height: 134px; scrollbar-width: thin; scrollbar-color: var(--surface1) transparent; }
+  #url-line.oneline { line-height: 44px; }
+  .pt { padding: 13px 3px; }
+  input.type-over { font-size: 14px; padding: 6px 4px; line-height: 1.4; }
+  .bar { align-items: center; }
+  .bar-lock { padding-top: 0; }
+  .bar-tools { padding-top: 0; }
+
+  /* The cells give way before the strip overflows; their text is already ellipsed. */
+  .cell { min-height: 44px; padding: 4px 12px; font-size: 12px; min-width: 0; }
+  .cell .nm { font-size: 11px; }
+  .cell .ct { font-size: 11.5px; min-width: 0; }
+  .strip .tools { gap: 6px; flex-shrink: 0; }
+
+  /* One scroll region, the page, rather than a drawer scrolling inside it;
+     the head then sticks to the top of the viewport instead. */
+  .drawer { max-height: none; overflow: visible; }
+  .drawer-head { flex-wrap: wrap; padding: 6px 12px; }
+  .drawer-head .t { font-size: 11px; }
+  .drawer-head .sub { font-size: 11.5px; }
+  .drow { min-height: 44px; font-size: 13px; padding: 2px 8px 2px 12px; gap: 6px; }
+  .drow .n { font-size: 11px; }
+  /* The row actions have no hover to wait for on a touch screen. */
+  .drow .acts { opacity: 1; }
+  .drow input.type-over { font-size: 13px; }
+  .peelbox { padding: 7px 12px 10px; }
+  .peelbox pre { font-size: 12px; max-height: 132px; scrollbar-width: thin; scrollbar-color: var(--surface1) transparent; }
+  .peelbox .peel-tools { flex-wrap: wrap; }
+  .hint { font-size: 12px; padding: 12px; }
+
+  /* Keyboard hints are noise on a screen with no keyboard. */
+  .keys { display: none; }
+
+  .status-bar { padding: 8px 12px; }
+  .change-summary { font-size: 12px; }
+  /* The page scrolls, so the toast pins to the viewport rather than the app. */
+  .toast { position: fixed; bottom: 12px; font-size: 13px; }
+}
+
+/* A phone: the bar's tools, the section cells and the action row stack. */
+@media (max-width: 599px) {
+  .bar { flex-wrap: wrap; gap: 6px 8px; padding: 8px 12px; }
+  .bar-lock { display: none; }
+  #url-line { flex: 1 1 100%; }
+  .bar-tools { margin-left: auto; }
+
+  .strip { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .strip .grow { display: none; }
+  .cell { border-right-width: 1px; border-radius: 6px; max-width: none; min-width: 0; }
+  .cell:first-child, .cell:nth-child(4) { border-radius: 6px; }
+  .cell.on + .cell { border-left-color: var(--surface0); }
+  .cell .ct { flex: 1; min-width: 0; }
+  .strip .tools { grid-column: 1 / -1; }
+  .strip .tools .btn { flex: 1; }
+
+  /* Head: title and count on the first row, then the buttons two to a row. */
+  .drawer-head .sub { flex: 1 1 calc(100% - 90px); }
+  .drawer-head .btn { flex: 1 1 40%; }
+  .drow .k { max-width: 35%; }
+
+  .status-bar { flex-wrap: wrap; gap: 6px; }
+  .change-summary { flex: 1 1 100%; }
+  .change-summary:empty { display: none; }
+  .status-bar .btn { flex: 1; }
+}
