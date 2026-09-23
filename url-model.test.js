@@ -22,8 +22,14 @@ import {
   toJson,
   safeDecode,
   originParts,
+  hostOf,
+  normalizeHost,
+  setHost,
   BLANK_KEY,
   BLANK_SEGMENT,
+  BLANK_HOST,
+  BAD_HOST,
+  FIXED_HOST,
 } from './url-model.js';
 
 // The exact URL the report drove the extension with.
@@ -357,4 +363,96 @@ test('originParts falls back to one host part when the pieces do not add up', ()
   assert.deepEqual(originParts(model), [{ role: 'host', raw: 'something://else' }]);
   model.href = 'not a url';
   assert.deepEqual(originParts(model), [{ role: 'host', raw: 'something://else' }]);
+});
+
+// --- setHost ---
+
+test('setHost changes only the host, byte for byte', () => {
+  assert.equal(
+    edit(REPORT_URL, m => setHost(m, 'example-demo.com')),
+    'http://example-demo.com/docs/guide/?q=hello%20world&tags=a,b&redirect=https://x.io/cb&debug&tag=a&tag=b#section-2'
+  );
+  assert.equal(
+    edit('https://shop.example.com:8443/eu/women%27s%20shoes?q=a%20b&debug#reviews', m => setHost(m, 'shop-demo.example.com:8443')),
+    'https://shop-demo.example.com:8443/eu/women%27s%20shoes?q=a%20b&debug#reviews'
+  );
+});
+
+test('setHost keeps the scheme and the user info', () => {
+  assert.equal(edit('https://user:pw@example.com/p?x=1', m => setHost(m, 'localhost')), 'https://user:pw@localhost/p?x=1');
+  assert.equal(edit('http://example.com/p', m => setHost(m, 'example-demo.com')), 'http://example-demo.com/p');
+});
+
+test('the text carries the port: one in it replaces the port, none drops it', () => {
+  assert.equal(edit('https://example.com/p', m => setHost(m, 'localhost:3000')), 'https://localhost:3000/p');
+  assert.equal(edit('https://localhost:3000/p', m => setHost(m, 'example.com')), 'https://example.com/p');
+  assert.equal(edit('https://localhost:3000/p', m => setHost(m, 'localhost:4000')), 'https://localhost:4000/p');
+  assert.equal(edit('http://[::1]:8080/p', m => setHost(m, '[::1]:9090')), 'http://[::1]:9090/p');
+});
+
+test('setHost normalises the way the address bar does', () => {
+  assert.equal(edit('https://example.com/p', m => setHost(m, ' Example-Demo.COM ')), 'https://example-demo.com/p');
+  const model = parseUrl('https://example.com:8443/p');
+  assert.deepEqual(setHost(model, 'example.com:443'), { ok: true });
+  assert.equal(buildUrl(model), 'https://example.com/p');
+});
+
+test('setHost refuses a port on a file URL', () => {
+  const model = parseUrl('file:///tmp/notes.txt');
+  assert.deepEqual(setHost(model, 'nas:2049'), { ok: false, error: BAD_HOST });
+  assert.equal(buildUrl(model), 'file:///tmp/notes.txt');
+});
+
+test('setHost leaves the parts readable afterwards', () => {
+  const model = parseUrl('https://user:pw@example.com:8443/p');
+  setHost(model, 'localhost:3000');
+  assert.deepEqual(originParts(model), [
+    { role: 'scheme', raw: 'https://' },
+    { role: 'userinfo', raw: 'user:pw@' },
+    { role: 'host', raw: 'localhost' },
+    { role: 'port', raw: ':3000' },
+  ]);
+  assert.equal(hostOf(model), 'localhost:3000');
+});
+
+test('setHost refuses what is not a host and leaves the model alone', () => {
+  const url = 'https://example.com/p?x=1#f';
+  for (const [text, error] of [
+    ['', BLANK_HOST],
+    ['   ', BLANK_HOST],
+    ['a/b', BAD_HOST],
+    ['https://x.io', BAD_HOST],
+    ['user@host', BAD_HOST],
+    ['host?x=1', BAD_HOST],
+    ['host#frag', BAD_HOST],
+    ['two words', BAD_HOST],
+    ['host:notaport', BAD_HOST],
+    ['host:99999', BAD_HOST],
+  ]) {
+    const model = parseUrl(url);
+    assert.deepEqual(setHost(model, text), { ok: false, error }, JSON.stringify(text));
+    assert.equal(buildUrl(model), url, JSON.stringify(text));
+  }
+});
+
+test('setHost refuses a URL whose prefix cannot be split', () => {
+  const model = parseUrl('mailto:someone@example.com');
+  assert.deepEqual(setHost(model, 'example.com'), { ok: false, error: FIXED_HOST });
+  assert.equal(model.prefix, 'mailto:');
+});
+
+test('hostOf is the host with its port and nothing else', () => {
+  assert.equal(hostOf(parseUrl('https://user:pw@example.com:8443/p')), 'example.com:8443');
+  assert.equal(hostOf(parseUrl('https://example.com/p')), 'example.com');
+  assert.equal(hostOf(parseUrl('mailto:someone@example.com')), '');
+});
+
+test('normalizeHost accepts a host, with or without a port, and rejects more than that', () => {
+  assert.deepEqual(normalizeHost('Example.com'), { ok: true, host: 'example.com' });
+  assert.deepEqual(normalizeHost('localhost:3000'), { ok: true, host: 'localhost:3000' });
+  assert.deepEqual(normalizeHost('[::1]:8080'), { ok: true, host: '[::1]:8080' });
+  assert.deepEqual(normalizeHost('bücher.de'), { ok: true, host: 'xn--bcher-kva.de' });
+  assert.equal(normalizeHost('').ok, false);
+  assert.equal(normalizeHost('https://example.com').ok, false);
+  assert.equal(normalizeHost('example.com/path').ok, false);
 });

@@ -6,20 +6,23 @@ build, test and browser-verification details.
 ## Where things stand
 
 **The UX redesign is built: the popup is prototype E, the second address bar, on the real staging
-layer.** It is in the owner's hands to test, from the installed extension or from the no-install demo
-in [`docs/demo/`](docs/demo/). The defaults listed below were taken from the prototype where the
-review left a question open; each is his to change.
+layer, and the first "smarter function" is in: host groups.** The owner defines groups of
+interchangeable hosts on a settings page; when the tab is on one of them the host cell offers the
+others, and switching is staged like any edit. It is in the owner's hands to test, from the installed
+extension or from the no-install demo in [`docs/demo/`](docs/demo/). The defaults listed below were
+taken from the prototype where the review left a question open; each is his to change.
 
 ## What the extension does today
 
 A Manifest V3 popup for Chrome, Edge and Firefox, 800 pixels wide, that shows the current tab's URL
 as one coloured line with a button per part, a strip of section cells (host, path, query, fragment)
 and a drawer per section. Click a part to type over it; copy, decode, delete and restore from the
-drawer; ⚡ Clean strips tracking parameters. Nothing navigates until Apply. `README.md` → *What it
-does today* has the full list and the keyboard map.
+drawer; ⚡ Clean strips tracking parameters; a host in one of the owner's host groups (settings page,
+⚙ in the header) gets a ⇄ switch dropdown of the group's other hosts. Nothing navigates until Apply.
+`README.md` → *What it does today* has the full list and the keyboard map.
 
-Health: `npm test` → 128 tests, all passing, across `url-model`, `url-tokens`, `value-inspect` and
-`draft`. Permissions are `activeTab` only. No build step, no dependencies.
+Health: `npm test` → 157 tests, all passing, across `url-model`, `url-tokens`, `value-inspect`,
+`draft` and `settings`. Permissions are `activeTab` and `storage`. No build step, no dependencies.
 
 ## What has landed
 
@@ -32,6 +35,7 @@ Health: `npm test` → 128 tests, all passing, across `url-model`, `url-tokens`,
 | #5 | Edits are staged behind an Apply step (`draft.js`), so nothing navigates until you say so; accessibility gaps fixed. |
 | #6 | The UX review: eight working prototypes, findings, and the handover that led here. |
 | #7 | The second address bar (prototype E) built into the popup; `url-tokens.js` and `value-inspect.js` moved in with tests; ⚡ Clean staged in `draft.js`; the no-install demo in `docs/demo/`. |
+| next | Host groups: a settings page (`options.html`, `settings.js`, `chrome.storage.sync` with a local fallback, the `storage` permission), `setHost` in the model, the ⇄ switch beside the host cell, the demo's sample groups. |
 
 ## Decisions now settled
 
@@ -64,20 +68,27 @@ owner can change any of them after trying it:
 9. **+ param** adds a `key=value` placeholder and arms the name, then (on Enter) the value — E's
    flow rather than the old key/value form at the bottom. Escape, or an empty name, takes the
    placeholder back out, so nothing is staged.
-10. **Host and fragment are read-only** in the bar: the model has no edit function for either and E
-    only got them "for free" by splicing text. They open their section, and copy.
+10. **The fragment is read-only** in the bar, and the host is typed over by nobody: the model now
+    has `setHost`, but the bar offers the host only through the ⇄ switch of a configured group (the
+    owner's ask), not as a free type-over. Both parts open their section, and copy.
+11. **Host groups are a textarea, one group per line** (`example.com, example-demo.com,
+    localhost:3000`), hosts written the way the address bar shows them, port included. The first
+    option of the switch is a label, so picking a host is an action and the control reads "switch"
+    again once the change is staged; a host in no group changes nothing in the bar.
 
 ## Still open
 
-1. **Editing the host or the fragment.** Wants `setHost` / `setHash` in `url-model.js` (with
-   `rowStatus` coverage in `draft.js`) before the bar can offer them.
+1. **Typing over the host, and editing the fragment.** `setHost` and `hostStatus` exist now, so a
+   host type-over in the bar is a popup change; the fragment still wants `setHash` in `url-model.js`.
 2. **Character-level type-over.** Selecting characters across parts and typing is prototype A's
    editable line; the tokeniser it needs is now `url-tokens.js`, so it can be added inside E's shell.
 3. **Re-packing a peeled value.** "Look inside" decodes base64 and JSON for reading; an edit only
    re-encodes the percent layer, so editing decoded JSON and having it re-packed is not built.
 4. **Reorder.** Needs `moveSegment` / `moveEntry` and a `moved` status in `draft.js` first.
-5. **Whether the Clean list is editable**, and per-site presets, paste-any-URL: the "smarter
-   functions" from question 4 that did not make this first cut.
+5. **Whether the Clean list is editable**, and paste-any-URL: the "smarter functions" from question
+   4 still not built. The settings page is the natural home for an editable Clean list. Host groups
+   could also grow: a `chrome.storage.onChanged` listener would let an open popup follow a save, and
+   the switch could carry a scheme (`http://localhost:3000`) if a group ever mixes them.
 6. **Firefox at the 600 cap.** Measured in Firefox 140 ESR: the panel follows the 800 body width
    and sizes its height from content (226 shut, 486 with the query drawer open on the monster URL),
    so the shell never reaches the cap. What happens at 600 - whether the drawer scrolls or the panel
@@ -96,5 +107,6 @@ These are easy to break by accident while iterating. `AGENTS.md` explains each.
 - `url-model.js` is the only place URLs are parsed and rebuilt; nothing else re-implements it.
   `url-tokens.js` only lays offsets over what the model built.
 - Only `applyDraft` in `popup.js` navigates. Every edit goes through `draft.js`.
-- `activeTab` is the only permission. Adding `tabs` buys nothing and adds a browsing-history warning.
+- `activeTab` is the only tab-related permission; `storage` is the only other one. Adding `tabs` buys
+  nothing and adds a browsing-history warning.
 - No build step, bundler, framework or runtime dependency in the extension itself.

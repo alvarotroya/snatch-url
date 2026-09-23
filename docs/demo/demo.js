@@ -1,7 +1,9 @@
 // Snatch URL - docs/demo/demo.js
 //
 // The mock browser around the real popup: a fake tab, a stub for the three
-// chrome.tabs calls popup.js makes, and a log of what the popup asked for.
+// chrome.tabs calls popup.js makes, a stub for chrome.storage with a sample
+// host group in it, and a log of what the popup asked for. The settings page
+// is the real options.html too, opened the way the popup's ⚙ opens it.
 // See index.html for what the demo can and cannot show.
 
 // The review's three sample URLs (docs/ux-review/src/proto-core.js).
@@ -21,8 +23,18 @@ const SAMPLES = {
     + '&utm_source=newsletter&utm_medium=email&utm_campaign=q3%20wrap&debug#panel-spend',
 };
 
+// A built-in sample of what the settings page lets the owner define: the
+// short and typical URLs' hosts each have a stand-in; the monster's has none.
+const SAMPLE_SETTINGS = {
+  groups: [
+    ['example.com', 'example-demo.com', 'localhost:3000'],
+    ['shop.example.com:8443', 'shop-demo.example.com:8443'],
+  ],
+};
+
 const $ = id => document.getElementById(id);
 let tabUrl = SAMPLES.monster;
+let stored = { settings: SAMPLE_SETTINGS };   // what chrome.storage.sync holds
 
 function log(kind, text) {
   const li = document.createElement('li');
@@ -42,13 +54,27 @@ function showTab() {
 }
 
 /**
- * Exactly the three calls popup.js makes, answered from the fake tab.
+ * Exactly the calls popup.js and options.js make: three on chrome.tabs,
+ * answered from the fake tab; get/set on chrome.storage.sync, answered from
+ * an in-memory store seeded with the sample group; and openOptionsPage.
  * `chrome.runtime.lastError` stays undefined, so nothing is ever refused.
  */
 window.snatchDemo = {
   chromeStub() {
     return {
-      runtime: {},
+      runtime: {
+        openOptionsPage() { log('', 'runtime.openOptionsPage'); openOptions(); },
+      },
+      storage: {
+        sync: {
+          get(key, cb) { cb({ [key]: stored[key] }); },
+          set(items, cb) {
+            Object.assign(stored, items);
+            log('set', `storage.sync.set → ${JSON.stringify(items)}`);
+            cb();
+          },
+        },
+      },
       tabs: {
         query(_query, cb) { cb([{ id: 1, url: tabUrl }]); },
         update(_id, { url }, cb) {
@@ -95,6 +121,28 @@ async function openPopup() {
   }, { once: true });
 }
 
+let optionsHtml = null;
+
+/** Open the settings page as the popup's ⚙ would: the real options.html, same stub. */
+async function openOptions() {
+  if (optionsHtml === null) {
+    const res = await fetch('../../options.html');
+    if (!res.ok) { log('', `could not load options.html (${res.status}); serve the repository root`); return; }
+    optionsHtml = await res.text();
+  }
+  const doc = optionsHtml
+    .replace('href="styles.css"', 'href="../../styles.css"')
+    .replace('src="options.js"', 'src="../../options.js"')
+    .replace('<head>', '<head><script>window.chrome = parent.snatchDemo.chromeStub();<' + '/script>');
+  $('options').classList.remove('closed');
+  $('options-frame').srcdoc = doc;
+}
+
+function closeOptions() {
+  $('options').classList.add('closed');
+  log('', 'settings closed - reopen the popup to see the groups it now knows');
+}
+
 function setTab(url, label) {
   tabUrl = url;
   showTab();
@@ -115,6 +163,8 @@ $('custom').addEventListener('submit', e => {
   setTab(url, null);
 });
 $('reopen-btn').addEventListener('click', () => { log('', 'popup reopened'); openPopup(); });
+$('settings-btn').addEventListener('click', () => { log('', 'settings opened'); openOptions(); });
+$('options-close').addEventListener('click', closeOptions);
 $('icon-btn').addEventListener('click', () => { log('', 'popup reopened'); openPopup(); });
 
 showTab();

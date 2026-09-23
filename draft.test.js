@@ -20,6 +20,8 @@ import {
   editSegment,
   editKey,
   editValue,
+  editHost,
+  hostStatus,
   addParam,
   discardAdded,
   removeSegment,
@@ -84,6 +86,48 @@ test('editing a value back to its original clears the change', () => {
 
   assert.equal(isDirty(draft), false);
   assert.equal(draftUrl(draft), URL_UNDER_TEST);
+});
+
+test('a host change is staged, counted once and shown as modified', () => {
+  const draft = fresh();
+  assert.deepEqual(editHost(draft, 'example-demo.com'), { ok: true });
+
+  assert.equal(draftUrl(draft), 'https://example-demo.com/docs/guide?q=hello%20world&debug&tag=a');
+  assert.equal(baseUrl(draft), URL_UNDER_TEST);
+  assert.equal(hostStatus(draft), 'modified');
+  assert.equal(changeCount(draft), 1);
+  assert.equal(changeSummary(draft), '1 unapplied change');
+
+  editHost(draft, 'localhost:3000');
+  assert.equal(changeCount(draft), 1);
+  assert.equal(draftUrl(draft), 'https://localhost:3000/docs/guide?q=hello%20world&debug&tag=a');
+});
+
+test('switching the host back clears the change', () => {
+  const draft = fresh();
+  editHost(draft, 'example-demo.com');
+  editHost(draft, 'example.com');
+  assert.equal(hostStatus(draft), 'unchanged');
+  assert.equal(isDirty(draft), false);
+});
+
+test('a rejected host leaves the draft clean', () => {
+  const draft = fresh();
+  assert.equal(editHost(draft, 'not a host').ok, false);
+  assert.equal(isDirty(draft), false);
+  assert.equal(draftUrl(draft), URL_UNDER_TEST);
+});
+
+test('revert and rebase cover the host too', () => {
+  const draft = fresh();
+  editHost(draft, 'example-demo.com');
+  revert(draft);
+  assert.equal(draftUrl(draft), URL_UNDER_TEST);
+
+  editHost(draft, 'example-demo.com');
+  rebase(draft);
+  assert.equal(hostStatus(draft), 'unchanged');
+  assert.equal(baseUrl(draft), 'https://example-demo.com/docs/guide?q=hello%20world&debug&tag=a');
 });
 
 test('a renamed key is still the same row, not an add plus a delete', () => {

@@ -152,6 +152,43 @@ body {
 #log li { overflow-wrap: anywhere; }
 #log li.nav { color: var(--green); }
 #log li.new { color: var(--mauve); }
+#log li.set { color: var(--yellow, #f9e2af); }
+
+/* --- THE SETTINGS PAGE: the real options.html, shown as a browser tab would --- */
+#options {
+  position: absolute;
+  top: 70px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--base);
+  border-top: 1px solid var(--surface1);
+  display: flex;
+  flex-direction: column;
+}
+#options.closed { display: none; }
+#options .options-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--mantle);
+  border-bottom: 1px solid var(--surface0);
+}
+#options .options-head code { font-family: var(--mono); color: var(--text); }
+#options .options-head .grow { flex: 1; }
+#options .options-head button {
+  background: transparent;
+  border: 1px solid var(--surface0);
+  border-radius: 999px;
+  color: var(--muted);
+  font: inherit;
+  padding: 2px 9px;
+  cursor: pointer;
+}
+#options-frame { flex: 1; width: 100%; border: none; background: var(--base); }
 
 /* --- THE POPUP: the real one, in a frame sized the way a popup is --- */
 #popup {
@@ -195,6 +232,7 @@ body {
       <button type="submit">go</button>
     </form>
     <button type="button" id="reopen-btn" title="Close and reopen the popup, as clicking the toolbar icon would">reopen popup</button>
+    <button type="button" id="settings-btn" title="Open the extension's settings page, as the popup's ⚙ would">settings</button>
   </div>
 
   <div id="browser">
@@ -218,6 +256,16 @@ body {
         <kbd>⚡ Clean</kbd> on the monster URL, and press <kbd>Apply</kbd>: the mock address bar above
         follows, and the log below records what the extension asked the browser to do.
       </p>
+      <p>
+        <b>Host groups.</b> The demo's settings hold two sample groups:
+        <code>example.com, example-demo.com, localhost:3000</code> and
+        <code>shop.example.com:8443, shop-demo.example.com:8443</code>. Pick the <kbd>short</kbd> or
+        <kbd>typical</kbd> URL and the host cell gains a <kbd>⇄ switch</kbd> dropdown of the group's
+        other hosts; choosing one stages the switch, and <kbd>Apply</kbd> goes there. The monster URL's
+        host is in no group, so its bar shows nothing extra. <kbd>settings</kbd> above, or the popup's
+        <kbd>⚙</kbd>, opens the real settings page over this one; what you save there is what the next
+        popup reads.
+      </p>
 
       <h2>What happened</h2>
       <ol id="log"></ol>
@@ -232,6 +280,8 @@ body {
           real popup with a "Can't edit this page" message; the fake tab never refuses.</li>
         <li>Clipboard access runs under this page's permissions, not the extension's.</li>
         <li>Navigation is simulated: nothing is loaded, only the mock address bar changes.</li>
+        <li>Settings are kept in memory for this page only, seeded with the sample groups; the
+          installed extension keeps them in the browser's synced extension storage.</li>
       </ul>
 
       <h2>Running it</h2>
@@ -244,6 +294,15 @@ body {
 
     <div id="popup">
       <iframe id="popup-frame" title="Snatch URL popup" allow="clipboard-write"></iframe>
+    </div>
+
+    <div id="options" class="closed">
+      <div class="options-head">
+        <span>settings · the real <code>options.html</code>, as the browser's extension settings page would show it</span>
+        <span class="grow"></span>
+        <button type="button" id="options-close">close</button>
+      </div>
+      <iframe id="options-frame" title="Snatch URL settings"></iframe>
     </div>
   </div>
 </div>

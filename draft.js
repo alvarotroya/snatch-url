@@ -25,6 +25,7 @@ import {
   setValue,
   deleteEntry,
   addEntry,
+  setHost,
 } from './url-model.js';
 
 /**
@@ -93,10 +94,20 @@ export function rowStatus(draft, kind, row) {
   return same ? 'unchanged' : 'modified';
 }
 
-/** How many rows the user has touched: edits, additions and deletions. */
+/**
+ * Whether the host differs from the tab's. The host is one part, not a row,
+ * so it has its own status; the prefix is where the model keeps it.
+ * @returns {'modified'|'unchanged'}
+ */
+export function hostStatus(draft) {
+  return draft.work.prefix === draft.base.prefix ? 'unchanged' : 'modified';
+}
+
+/** How many parts the user has touched: the host, edits, additions and deletions. */
 export function changeCount(draft) {
   const touched = (kind, rows) => rows.filter(r => rowStatus(draft, kind, r) !== 'unchanged').length;
-  return touched('segment', draft.work.segments)
+  return (hostStatus(draft) === 'modified' ? 1 : 0)
+    + touched('segment', draft.work.segments)
     + touched('entry', draft.work.entries)
     + draft.removed.length;
 }
@@ -127,6 +138,11 @@ export function editSegment(draft, index, text) {
 
 export function editKey(draft, index, text) {
   return setKey(draft.work, index, text);
+}
+
+/** setHost on the working copy; a host switch from a group lands here too. */
+export function editHost(draft, text) {
+  return setHost(draft.work, text);
 }
 
 export function editValue(draft, index, text) {
