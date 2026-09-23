@@ -66,7 +66,8 @@ the lookups (`groupOf`, `alternatives`, matched by `isHostOf` in `url-model.js` 
 scheme, so a written `:443` matches an https tab and an entry's own scheme must agree)
 and storage. Storage takes the `chrome` object as an argument so the tests and the demo can
 hand in a fake; it uses `storage.sync` and falls back to `storage.local` when sync is missing
-or errors, which is how Firefox reports sync as unavailable. `options.html` is one textarea
+or errors (which is how Firefox reports sync as unavailable) or refuses a write. So a load reads
+on past a sync that holds nothing, and a fallback save removes sync's copy so it can't hide the local one. `options.html` is one textarea
 plus Save; `popup.js` reads the settings once, before the first render, and the host switch
 is a native `<select>` whose first option is a label. The strip's cell rounding is
 `:first-of-type` / `:last-of-type` because that select sits between the first two cells.
