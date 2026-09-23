@@ -180,6 +180,28 @@ body {
 }
 #popup-frame { display: block; width: 100%; height: 200px; border: none; background: var(--base); }
 #popup.closed { display: none; }
+
+/* --- A phone: one scrolling page, the popup in flow under the omnibar --- */
+@media (max-width: 799px) {
+  html, body { height: auto; }
+  body { overflow: auto; }
+  #app { display: block; height: auto; }
+
+  /* The sample switcher stays visible and tappable: 44px pills, the paste
+     field on its own row. */
+  .demo-bar { gap: 8px; padding: 8px 12px; font-size: 12px; }
+  .demo-bar button { min-height: 44px; padding: 0 14px; }
+  .demo-bar form { flex: 1 1 100%; min-width: 0; }
+  .demo-bar input { min-height: 44px; font-size: 13px; padding: 0 12px; }
+
+  #browser { display: flex; flex-direction: column; overflow: visible; }
+  .omnibar { padding: 8px 10px; }
+  .ext-icon { width: 44px; height: 44px; font-size: 16px; }
+
+  /* Under the omnibar, as the real popup drops; the notes follow. */
+  #popup { position: relative; order: 1; top: auto; right: auto; width: auto; max-width: none; margin: 10px 8px 0; }
+  #page { order: 2; height: auto; max-width: none; padding: 20px 16px; }
+}
 </style>
 </head>
 <body>
@@ -227,7 +249,9 @@ body {
         <li>The real popup closes when it loses focus and reopens fresh from the toolbar icon;
           <kbd>reopen popup</kbd> stands in for that.</li>
         <li>Chrome sizes the real popup from its content and caps it at 800 × 600; the frame here
-          mimics that cap but is not the browser's own bubble, and Firefox's panel is not simulated.</li>
+          mimics that cap but is not the browser's own bubble, and Firefox's panel is not simulated.
+          On a phone the frame takes the screen's width, as Firefox for Android's popup does, and
+          keeps the 600 cap, which that popup does not have.</li>
         <li>Restricted pages (<code>chrome://</code>, the Web Store, <code>about:</code>) fail in the
           real popup with a "Can't edit this page" message; the fake tab never refuses.</li>
         <li>Clipboard access runs under this page's permissions, not the extension's.</li>

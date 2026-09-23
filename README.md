@@ -13,7 +13,9 @@ edges, and expect the UI to change. The design is prototype E of the UX review i
 ## What it does today
 
 Click the toolbar icon and the popup reads the active tab's URL. It is 800 pixels wide,
-Chrome's cap for a popup, so a typical URL fits on one to three lines.
+Chrome's cap for a popup, so a typical URL fits on one to three lines. On a narrower
+screen, Firefox for Android or the demo on a phone, it takes the width it is given: the
+same parts, stacked, with tap-sized controls.
 
 **The bar.** The URL as it will be navigated to, coloured by role: host, path segments,
 parameter names, parameter values, fragment. Click any path segment, parameter name or
