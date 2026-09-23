@@ -488,6 +488,7 @@ function editPart(id, where, { then, initial, cancel } = {}) {
     const cancelled = !!cancel && (!ok || input.value.trim() === '');
     if (cancelled) cancel();
     const staged = !cancelled && ok && commitEdit(t, input.value);
+    retokenize();
     if (defer) scheduleRender(focusKey); else render(focusKey);
     if (staged && apply) applyDraft('current');
     // Only Enter carries on to the next step; clicking away means away.
