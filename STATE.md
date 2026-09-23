@@ -14,12 +14,13 @@ taken from the prototype where the review left a question open; each is his to c
 
 ## What the extension does today
 
-A Manifest V3 popup for Chrome, Edge and Firefox, 800 pixels wide, that shows the current tab's URL
-as one coloured line with a button per part, a strip of section cells (host, path, query, fragment)
-and a drawer per section. Click a part to type over it; copy, decode, delete and restore from the
-drawer; ⚡ Clean strips tracking parameters; a host in one of the owner's host groups (settings page,
-⚙ in the header) gets a ⇄ switch dropdown of the group's other hosts. Nothing navigates until Apply.
-`README.md` → *What it does today* has the full list and the keyboard map.
+A Manifest V3 popup for Chrome, Edge and Firefox, 800 pixels wide on a desktop and fluid below
+that, that shows the current tab's URL as one coloured line with a button per part, a strip of
+section cells (host, path, query, fragment) and a drawer per section. Click a part to type over
+it; copy, decode, delete and restore from the drawer; ⚡ Clean strips tracking parameters; a host in
+one of the owner's host groups (settings page, ⚙ in the header) gets a ⇄ switch dropdown of the
+group's other hosts. Nothing navigates until Apply. `README.md` → *What it does today* has the full
+list and the keyboard map.
 
 Health: `npm test` → 157 tests, all passing, across `url-model`, `url-tokens`, `value-inspect`,
 `draft` and `settings`. Permissions are `activeTab` and `storage`. No build step, no dependencies.
@@ -35,6 +36,7 @@ Health: `npm test` → 157 tests, all passing, across `url-model`, `url-tokens`,
 | #5 | Edits are staged behind an Apply step (`draft.js`), so nothing navigates until you say so; accessibility gaps fixed. |
 | #6 | The UX review: eight working prototypes, findings, and the handover that led here. |
 | #7 | The second address bar (prototype E) built into the popup; `url-tokens.js` and `value-inspect.js` moved in with tests; ⚡ Clean staged in `draft.js`; the no-install demo in `docs/demo/`. |
+| #8 | The popup and the demo adapt below 800 wide: fluid shell, 44 px tap targets, no hover-only actions, stacking under 600. Verified in Chromium at 360 / 412 / 768 / 800 and in Firefox 140 (`docs/responsive/`); not on Firefox for Android itself. |
 | next | Host groups: a settings page (`options.html`, `settings.js`, `chrome.storage.sync` with a local fallback, the `storage` permission), `setHost` in the model, the ⇄ switch beside the host cell, the demo's sample groups. |
 
 ## Decisions now settled
@@ -93,6 +95,10 @@ owner can change any of them after trying it:
    and sizes its height from content (226 shut, 486 with the query drawer open on the monster URL),
    so the shell never reaches the cap. What happens at 600 - whether the drawer scrolls or the panel
    does - has not been provoked there.
+7. **Firefox for Android in the hand.** The narrow layout is built for its full-width popup and
+   checked in Chromium and desktop Firefox at phone widths, but nobody has opened it on a phone
+   yet. The owner's demo-over-the-tailnet try is the first real test; the 44 px targets, the
+   page-level scroll and the toast pinned to the viewport are what to judge.
 
 ## Next work, in order
 

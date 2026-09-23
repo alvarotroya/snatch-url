@@ -181,6 +181,16 @@ throwaway profile, so two sessions do not collide on 2828).
 
 Beware `pkill -f` patterns that also match your own shell's command line.
 
+## Narrow viewports
+
+`body` keeps `width: 800px` because a desktop popup sizes its bubble from the document's intrinsic
+width, and `max-width: 100%` does not enter that measurement: Chromium 153 and Firefox 140 both
+still open the installed popup at 800 on a short URL. A narrower viewport (Firefox for Android, the
+demo on a phone) does shrink the shell, and the two media tiers at the end of `styles.css` take
+over there: under 800, 44 px targets and no hover-only actions; under 600, stacking. Verify a
+narrow width with the demo's stub in a full-width frame resized by the driver, never by resizing
+the installed popup; `docs/responsive/README.md` records what was checked and where.
+
 ## Maintaining this file
 
 Keep this file for knowledge useful to almost every future agent session in this project.
