@@ -11,6 +11,8 @@
     <header class="pop-head">
       <h1>Snatch URL</h1>
       <span class="grow"></span>
+      <button id="settings-btn" class="btn btn-sm" aria-label="Open the settings page: host groups"
+              title="Settings: host groups">⚙</button>
       <button id="oneline-btn" class="btn btn-sm" aria-pressed="false"
               title="Collapse the URL to a single line that scrolls sideways">one line</button>
       <button id="decoded-btn" class="btn btn-sm" aria-pressed="false"
@@ -31,6 +33,8 @@
       <button class="cell" data-section="origin" data-fk="cell:origin" aria-expanded="false" aria-controls="drawer">
         <span class="nm">host</span><span class="ct" id="cell-origin"></span><span class="cv" aria-hidden="true">▾</span>
       </button>
+      <!-- Shown only when the host is in one of the owner's host groups (settings). -->
+      <select id="host-switch" class="host-switch hidden" data-fk="host-switch" aria-label="Switch host"></select>
       <button class="cell" data-section="path" data-fk="cell:path" aria-expanded="false" aria-controls="drawer">
         <span class="nm">path</span><span class="ct" id="cell-path"></span><span class="cv" aria-hidden="true">▾</span>
       </button>

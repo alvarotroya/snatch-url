@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snatch URL settings</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="options">
+  <main class="opts">
+    <h1>Snatch URL settings</h1>
+
+    <section>
+      <h2>Host groups</h2>
+      <p>
+        Hosts that stand in for each other, such as a site and its demo or staging copy. Write one
+        group per line, hosts separated by commas, each host the way the address bar shows it
+        (<code>example.com</code>, <code>localhost:3000</code>), optionally with a scheme
+        (<code>http://localhost:3000</code>) that switching to it also sets. When the tab is on a host from a
+        group, the popup's <b>host</b> cell offers the group's other hosts; picking one is staged
+        like any other edit, and nothing navigates until you press Apply.
+      </p>
+      <label for="groups">One group per line</label>
+      <textarea id="groups" spellcheck="false" autocomplete="off"
+                placeholder="example.com, example-demo.com, http://localhost:3000&#10;shop.example.com:8443, shop-demo.example.com:8443"></textarea>
+      <div id="problems" class="problems" aria-live="polite"></div>
+      <div class="opts-actions">
+        <span id="summary" class="summary" role="status"></span>
+        <button id="save-btn" class="btn btn-primary" type="button">Save</button>
+      </div>
+      <p class="opts-note" id="where"></p>
+    </section>
+  </main>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>

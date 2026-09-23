@@ -125,7 +125,7 @@ body {
 .pt { border-radius: 3px; cursor: pointer; padding: 1px 1px; }
 .pt:hover { background: var(--surface0); }
 .pt.on { background: var(--surface1); box-shadow: inset 0 -2px 0 var(--lavender); }
-.pt.changed { box-shadow: inset 0 -2px 0 var(--staged); }
+.pt.changed, .r-scheme.changed { box-shadow: inset 0 -2px 0 var(--staged); }
 .pt.on.changed { box-shadow: inset 0 -2px 0 var(--staged), 0 0 0 1px var(--lavender); }
 /* An empty segment (`/a//b`) still needs something to click. */
 .pt:empty::before { content: '·'; color: var(--surface2); padding: 0 2px; }
@@ -168,11 +168,12 @@ input.type-over {
   white-space: nowrap;
   max-width: 260px;
 }
-.cell:first-child { border-radius: 6px 0 0 6px; }
-.cell:nth-child(4) { border-radius: 0 6px 6px 0; border-right-width: 1px; }
+/* By type, not position: the host switch sits between the first two cells. */
+.cell:first-of-type { border-radius: 6px 0 0 6px; }
+.cell:last-of-type { border-radius: 0 6px 6px 0; border-right-width: 1px; }
 .cell:hover { background: var(--surface0); color: var(--text); }
 .cell.on { background: #2b2640; border-color: var(--mauve); color: var(--text); }
-.cell.on + .cell { border-left-color: var(--mauve); }
+.cell.on + .cell, .cell.on + .host-switch, .cell.on + .host-switch.hidden + .cell { border-left-color: var(--mauve); }
 .cell.empty { opacity: 0.5; }
 .cell .nm { font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; font-size: 10px; }
 .cell .ct {
@@ -186,6 +187,35 @@ input.type-over {
 .cell .cv { color: var(--surface2); font-size: 9px; }
 .cell.on .cv { transform: rotate(180deg); }
 .strip .tools { display: flex; gap: 5px; align-items: center; }
+
+/* The host switch: a dropdown of the other hosts in the current host's
+   group, joined to the host cell. Its first option is a label, so picking
+   a host is an action, not a selection that sticks. */
+.host-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  color-scheme: dark;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--mauve);
+  background: var(--mantle);
+  border: 1px solid var(--surface0);
+  border-right-width: 0;
+  padding: 4px 22px 4px 10px;
+  cursor: pointer;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background-image: linear-gradient(45deg, transparent 50%, var(--surface2) 50%),
+    linear-gradient(135deg, var(--surface2) 50%, transparent 50%);
+  background-position: calc(100% - 12px) 55%, calc(100% - 8px) 55%;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+.host-switch:hover { background-color: var(--surface0); color: var(--text); }
+.host-switch option { background: var(--mantle); color: var(--text); font-family: var(--mono); }
 
 /* --- Drawer --- */
 .drawer {
@@ -397,6 +427,53 @@ input.type-over {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--surface1); border-radius: 3px; }
 
+/* --- Options page (options.html): the same palette, its own layout --- */
+body.options {
+  width: auto;
+  min-width: 320px;
+  max-width: 720px;
+  overflow: auto;
+  padding: 18px 20px 24px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.opts h1 {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--mauve);
+  margin-bottom: 14px;
+}
+.opts h2 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.opts p { color: var(--muted); margin-bottom: 10px; }
+.opts label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.opts textarea {
+  display: block;
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  background: var(--crust);
+  color: var(--text);
+  border: 1px solid var(--surface0);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.opts textarea:focus { outline: none; border-color: var(--mauve); }
+.opts .problems { margin: 6px 0 0; font-size: 12px; color: var(--red); }
+.opts .problems:empty { display: none; }
+.opts .problems div { margin-bottom: 2px; overflow-wrap: anywhere; }
+.opts .problems code { font-family: var(--mono); background: var(--surface0); border-radius: 3px; padding: 0 3px; }
+.opts .opts-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.opts .summary { flex: 1; font-size: 12px; color: var(--muted); min-width: 0; }
+.opts .summary.saved { color: var(--green); }
+.opts .summary.failed { color: var(--red); }
+.opts .opts-note { font-size: 11.5px; margin-top: 12px; }
+.opts .btn { font-size: 12px; padding: 6px 14px; }
+
 /* --- Narrow viewports ---
    Everything above is the 800-wide layout and holds unchanged at 800 and up.
    Below it the shell is fluid: nothing is hidden, the bar wraps or scrolls
@@ -426,6 +503,7 @@ input.type-over {
   .cell { min-height: 44px; padding: 4px 12px; font-size: 12px; min-width: 0; }
   .cell .nm { font-size: 11px; }
   .cell .ct { font-size: 11.5px; min-width: 0; }
+  .host-switch { min-height: 44px; font-size: 12px; }
   .strip .tools { gap: 6px; flex-shrink: 0; }
 
   /* One scroll region, the page, rather than a drawer scrolling inside it;
@@ -460,11 +538,14 @@ input.type-over {
   #url-line { flex: 1 1 100%; }
   .bar-tools { margin-left: auto; }
 
-  .strip { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  /* Dense, so the host switch can take a full row under the host cell while
+     the four cells still pair up two to a row around it. */
+  .strip { display: grid; grid-template-columns: 1fr 1fr; grid-auto-flow: dense; gap: 6px; }
   .strip .grow { display: none; }
   .cell { border-right-width: 1px; border-radius: 6px; max-width: none; min-width: 0; }
-  .cell:first-child, .cell:nth-child(4) { border-radius: 6px; }
-  .cell.on + .cell { border-left-color: var(--surface0); }
+  .cell:first-of-type, .cell:last-of-type { border-radius: 6px; }
+  .cell.on + .cell, .cell.on + .host-switch, .cell.on + .host-switch.hidden + .cell { border-left-color: var(--surface0); }
+  .host-switch { grid-column: 1 / -1; border-right-width: 1px; border-radius: 6px; max-width: none; }
   .cell .ct { flex: 1; min-width: 0; }
   .strip .tools { grid-column: 1 / -1; }
   .strip .tools .btn { flex: 1; }

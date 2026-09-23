@@ -11,16 +11,19 @@
 
 import { tokenizeModel, groupRange, isPunct, ROLE_LABEL } from './url-tokens.js';
 import { peel, badgeFor, plainText } from './value-inspect.js';
-import { safeDecode, decodeQueryPart, toJson } from './url-model.js';
+import { safeDecode, decodeQueryPart, toJson, hostOf } from './url-model.js';
+import { DEFAULT_SETTINGS, loadSettings, alternatives } from './settings.js';
 import {
   createDraft,
   draftUrl,
   rowStatus,
+  hostStatus,
   changeSummary,
   isDirty,
   editSegment,
   editKey,
   editValue,
+  editHost,
   addParam,
   discardAdded,
   removeSegment,
@@ -35,6 +38,7 @@ import {
 // --- State ---
 
 let draft = null;                 // draft.js: the tab's URL and the edited copy
+let settings = DEFAULT_SETTINGS;  // settings.js: the owner's host groups
 let tok = { text: '', tokens: [] }; // url-tokens.js, laid over draft.work
 let openSection = null;           // 'origin' | 'path' | 'query' | 'hash' | null
 let activeId = null;              // the token id of the part being worked on
@@ -130,8 +134,14 @@ function rowOf(t) {
 }
 
 function statusOf(t) {
+  if (t.role === 'scheme' || t.role === 'host' || t.role === 'port') return hostStatus(draft);
   const r = rowOf(t);
   return r ? rowStatus(draft, r.kind, r.row) : 'unchanged';
+}
+
+/** The hosts the current host can be switched to: the rest of its group. */
+function otherHosts() {
+  return alternatives(settings.groups, draft.work);
 }
 
 /** The parameter a key or value token belongs to: `key`, `val` (or null). */
@@ -172,7 +182,10 @@ function renderBar() {
       line.append(sect);
     }
     if (isPunct(t.role)) {
-      sect.append(el('span', `r-${t.role}`, t.raw));
+      const punct = el('span', `r-${t.role}`, t.raw);
+      // The scheme is drawn as punctuation, but a host switch can change it.
+      if (t.role === 'scheme' && statusOf(t) !== 'unchanged') punct.classList.add('changed');
+      sect.append(punct);
       continue;
     }
     const shown = t.role === 'hash' ? `#${t.text}` : t.text;
@@ -217,6 +230,33 @@ function renderStrip() {
     cell.classList.toggle('empty', counts[key] === 0);
     cell.setAttribute('aria-expanded', String(openSection === key));
   }
+  renderHostSwitch();
+}
+
+/**
+ * The host switch beside the host cell: a dropdown of the other hosts in
+ * the current host's group, hidden when the host is in no group. Its first
+ * option is a label rather than the current host, so choosing an entry is
+ * an action and the control reads "switch" again once it has been staged.
+ */
+function renderHostSwitch() {
+  const sel = $('host-switch');
+  const others = otherHosts();
+  sel.replaceChildren();
+  sel.classList.toggle('hidden', others.length === 0);
+  if (others.length === 0) return;
+  const label = el('option', '', '⇄ switch');
+  label.value = '';
+  sel.append(label);
+  for (const h of others) {
+    const opt = el('option', '', h);
+    opt.value = h;
+    sel.append(opt);
+  }
+  sel.value = '';
+  const current = hostOf(draft.work);
+  sel.setAttribute('aria-label', `Switch host: ${current} stands in for ${others.join(', ')}`);
+  sel.title = `Switch ${current} to another host in its group`;
 }
 
 function rowActions(t, canPeel, canDelete) {
@@ -363,8 +403,10 @@ function renderDrawer() {
   head.append(el('span', 't', SECTION_NAME[openSection]));
   const sub = el('span', 'sub');
   const unit = openSection === 'query' ? 'param' : 'part';
+  const others = openSection === 'origin' ? otherHosts() : [];
   sub.textContent = `${live} ${unit}${live === 1 ? '' : 's'}`
     + (ghosts.length ? ` · ${ghosts.length} removed` : '')
+    + (others.length ? ` · in a group with ${others.join(', ')}` : '')
     + (openSection === 'origin' || openSection === 'hash' ? '' : ' · click a part to type over it');
   head.append(sub);
   const copyRaw = el('button', 'btn btn-sm', '⎘ Copy section');
@@ -562,6 +604,21 @@ function addParamFlow() {
   });
 }
 
+/**
+ * Switch the host to another in its group. Staged like any other edit: the
+ * host part turns amber and Apply is what navigates.
+ */
+function switchHost(to) {
+  const result = editHost(draft, to);
+  if (!result.ok) { showError(result.error); render('host-switch'); return; }
+  retokenize();
+  const host = tok.tokens.find(t => t.role === 'host');
+  activeId = host ? host.id : null;
+  peelId = null;
+  render('host-switch');
+  showNotice(`Host switched to ${to} - Apply to go there.`);
+}
+
 function clean() {
   const { count } = cleanTracking(draft);
   if (count === 0) { showNotice('No tracking parameters to strip.'); return; }
@@ -656,6 +713,9 @@ function bindStrip() {
   });
   $('clean-btn').addEventListener('click', clean);
   $('add-btn').addEventListener('click', addParamFlow);
+  $('host-switch').addEventListener('change', e => {
+    if (e.target.value) switchHost(e.target.value);
+  });
 }
 
 function bindDrawer() {
@@ -738,6 +798,10 @@ function bindKeys() {
 }
 
 function bindChrome() {
+  $('settings-btn').addEventListener('click', () => {
+    if (chrome.runtime && chrome.runtime.openOptionsPage) chrome.runtime.openOptionsPage();
+    else showError('Settings are not available here.');
+  });
   $('oneline-btn').addEventListener('click', () => {
     const on = $('url-line').classList.toggle('oneline');
     $('oneline-btn').setAttribute('aria-pressed', String(on));
@@ -824,4 +888,12 @@ function loadCurrentTab() {
   });
 }
 
-document.addEventListener('DOMContentLoaded', loadCurrentTab);
+/** The settings are read first, so the first render already knows the groups. */
+function start() {
+  loadSettings(chrome).then(loaded => {
+    settings = loaded;
+    loadCurrentTab();
+  });
+}
+
+document.addEventListener('DOMContentLoaded', start);

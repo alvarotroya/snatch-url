@@ -14,7 +14,7 @@ Do not hand-edit the PNGs; edit the script and re-run it.
 
 ## Tests
 
-`npm test` runs `node --test` (built in) over the four modules' `*.test.js`. `package.json`
+`npm test` runs `node --test` (built in) over the five modules' `*.test.js`. `package.json`
 carries a test script and nothing else.
 
 ## The URL model invariant
@@ -29,6 +29,14 @@ escape such as `%zz` falls back to the raw text. Any change here needs a case in
 
 Edit functions return `{ ok }` or `{ ok: false, error }` rather than throwing, so
 the popup can restore a rejected input and show the message.
+
+`setHost` takes `host` or `host:port` as the address bar shows it: a port in the text
+replaces the URL's and no port drops it (`localhost:3000` -> `example.com` must lose the
+3000), so hostname and port are set one by one - the WHATWG `host` setter keeps an old
+port when the text has none. A text led by `http://` or `https://` (a group entry may
+carry one) sets the scheme too; otherwise the host is probed under the URL's own scheme, which is what
+turns `example.com:443` on https into no port and refuses a port on `file:`. `setHost`
+also moves `model.href`, because `originParts` splits the prefix by parsing it.
 
 `url-tokens.js` lays character offsets over `buildUrl(model)` so the popup can show
 the URL as one line with a button per part; it reads the model and never rebuilds
@@ -51,12 +59,26 @@ focus back by the element's `data-fk` key. Keep both, or clicking from one part
 straight to another loses the second click, and keyboard users lose their place.
 The Clean list is `TRACKING_KEY` in `draft.js`; Clean stages removals like any delete.
 
+## Settings and host groups
+
+`settings.js` owns the host groups: the textarea grammar (`parseGroups` / `formatGroups`),
+the lookups (`groupOf`, `alternatives`, matched by `isHostOf` in `url-model.js` under the tab's
+scheme, so a written `:443` matches an https tab and an entry's own scheme must agree)
+and storage. Storage takes the `chrome` object as an argument so the tests and the demo can
+hand in a fake; it uses `storage.sync` and falls back to `storage.local` when sync is missing
+or errors (which is how Firefox reports sync as unavailable) or refuses a write. So a load reads
+on past a sync that holds nothing, and a fallback save removes sync's copy so it can't hide the local one. `options.html` is one textarea
+plus Save; `popup.js` reads the settings once, before the first render, and the host switch
+is a native `<select>` whose first option is a label. The strip's cell rounding is
+`:first-of-type` / `:last-of-type` because that select sits between the first two cells.
+
 ## Permissions
 
-`activeTab` alone is enough: it grants both `tab.url` and `chrome.tabs.update` for the
+`activeTab` alone covers the tab: it grants both `tab.url` and `chrome.tabs.update` for the
 active tab, from the moment the toolbar action is clicked. Do not add `tabs` - it buys
 nothing here and adds the "Read your browsing history" install warning. `tabs.create`,
-which "Apply in new tab" uses, needs no permission either.
+which "Apply in new tab" uses, needs no permission either. `storage` is the only other
+permission, for the host groups; it carries no install warning.
 
 The grant is what makes browser verification fiddly: it lasts only for the tab that was
 active when the action fired, so nothing can be tested by opening `popup.html` as an
@@ -88,8 +110,10 @@ same 600 cap, which the shell never reaches.
 
 `docs/demo/` mounts the real `popup.html` in an iframe (`srcdoc`, with the two
 relative paths pointed at the repository root and `window.chrome` stubbed before
-`popup.js` runs) inside a mock browser. Serve the repository root over HTTP and open
-`/docs/demo/`; `file://` cannot load the module. It is not referenced by the manifest.
+`popup.js` runs) inside a mock browser; `options.html` is mounted the same way, and the
+stub's `chrome.storage.sync` is an in-memory store seeded with sample groups. Serve the
+repository root over HTTP and open `/docs/demo/`; `file://` cannot load the module. It is
+not referenced by the manifest.
 
 ## Browser verification (Chrome)
 
@@ -122,6 +146,13 @@ popup to invoke its callback with a fake `chrome.runtime.lastError`.
 
 An unpacked extension's id is derived from its absolute path: sha256 of it, first 32 hex
 digits, each mapped 0-f to a-p.
+
+The driver hides `chrome://` tabs, and the popup's ⚙ opens one (`chrome://extensions/?options=`),
+which then stays the browser's active tab: every later trigger fails with "Cannot access this
+tab" while `pages` shows nothing wrong. From inside a popup, `chrome.tabs.query({})` lists it
+(url `null`), and `chrome.tabs.remove` on it needs no permission. Define groups by opening
+`chrome-extension://<id>/options.html` with `newpage` instead; `chrome.storage.sync` in the
+driver's throwaway profile does not survive a browser relaunch.
 
 ## Browser verification (Firefox)
 

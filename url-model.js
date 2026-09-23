@@ -69,7 +69,7 @@ export function decodeQueryPart(raw) {
  * @property {string} value
  *
  * @typedef {Object} UrlModel
- * @property {string} href           the original URL, untouched
+ * @property {string} href           the URL the prefix was taken from (setHost moves it)
  * @property {string} prefix         everything before the path (scheme, host, port)
  * @property {Segment[]} segments
  * @property {boolean} trailingSlash
@@ -169,6 +169,89 @@ export function originParts(model) {
   return parts.map(p => p.raw).join('') === model.prefix ? parts : whole;
 }
 
+/**
+ * The host the way the address bar shows it: `hostname` or `hostname:port`,
+ * with no scheme or user info. Empty when the prefix cannot be split.
+ *
+ * @param {UrlModel} model
+ * @returns {string}
+ */
+export function hostOf(model) {
+  const parts = originParts(model);
+  if (parts.length === 1 && parts[0].raw === model.prefix) return '';
+  return parts.filter(p => p.role === 'host' || p.role === 'port').map(p => p.raw).join('');
+}
+
+// --- Hosts ---
+
+export const BLANK_HOST = 'Host cannot be empty.';
+export const BAD_HOST = 'Not a valid host: write it the way the address bar shows it, such as example.com, localhost:3000 or http://localhost:3000.';
+export const FIXED_HOST = "The host of this URL can't be changed.";
+
+/**
+ * Check a host as a user would write it: `example.com`, `localhost:3000`,
+ * `[::1]:8080`, optionally led by `http://` or `https://`. Anything more - a
+ * path, user info, a query, another scheme - is refused. The host comes back
+ * lower-cased and IDNA-encoded, the way the URL parser writes it. A port the
+ * text gives is kept even when it is a default one, because without a scheme
+ * nothing says which default it would be; with a scheme, that scheme's default
+ * port is dropped. `text` is the whole entry in that normal form.
+ *
+ * @param {string} text
+ * @returns {{ok: true, scheme: string, host: string, text: string} | {ok: false, error: string}}
+ */
+export function normalizeHost(text) {
+  const trimmed = String(text ?? '').trim();
+  if (trimmed === '') return { ok: false, error: BLANK_HOST };
+  const [, given = '', rest] = /^(?:(https?:)\/\/)?(.*)$/is.exec(trimmed);
+  const scheme = given.toLowerCase();
+  if (rest === '' || /[\s/?#@\\]/.test(rest)) return { ok: false, error: BAD_HOST };
+  const probe = s => {
+    try {
+      const u = new URL(`${s}//${rest}/`);
+      return u.hostname !== '' && u.pathname === '/' && u.search === '' && u.hash === '' ? u : null;
+    } catch {
+      return null;
+    }
+  };
+  let host;
+  if (scheme) {
+    const u = probe(scheme);
+    if (!u) return { ok: false, error: BAD_HOST };
+    host = u.host;
+  } else {
+    const http = probe('http:');
+    const https = probe('https:');
+    if (!http || !https) return { ok: false, error: BAD_HOST };
+    const port = http.port || https.port;
+    host = http.hostname + (port ? ':' + port : '');
+  }
+  return { ok: true, scheme, host, text: (scheme ? scheme + '//' : '') + host };
+}
+
+/**
+ * Whether a host as normalizeHost takes it names the model's host: compared
+ * under the URL's own scheme, so `example.com:443` is `example.com` on https,
+ * and a text that carries a scheme matches only a URL with that scheme.
+ *
+ * @param {UrlModel} model
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function isHostOf(model, text) {
+  const checked = normalizeHost(text);
+  const current = hostOf(model);
+  if (!checked.ok || current === '') return false;
+  let protocol;
+  try {
+    protocol = new URL(model.href).protocol;
+    if (checked.scheme && checked.scheme !== protocol) return false;
+    return new URL(`${protocol}//${checked.host}/`).host === current;
+  } catch {
+    return false;
+  }
+}
+
 // --- Build ---
 
 /** @param {UrlModel} model @returns {string} */
@@ -259,6 +342,43 @@ export function addEntry(model, key, value) {
 
 export function clearEntries(model) {
   model.entries.length = 0;
+  return OK;
+}
+
+/**
+ * Replace the host. The text is `host` or `host:port`, as the address bar
+ * shows it: a port in the text replaces the URL's, and no port means none, so
+ * switching `localhost:3000` to `example.com` drops the 3000. A text led by
+ * `http://` or `https://` sets the scheme too; otherwise the scheme is kept.
+ * User info, path, query and fragment are not touched; an invalid host, or a
+ * URL whose prefix cannot be split into parts, is refused and the model left
+ * alone.
+ */
+export function setHost(model, text) {
+  const checked = normalizeHost(text);
+  if (!checked.ok) return reject(checked.error);
+  const parts = originParts(model);
+  if (parts.length === 1 && parts[0].raw === model.prefix) return reject(FIXED_HOST);
+
+  // The host as the target scheme normalises it (`:443` on https is no port
+  // at all), which also refuses what the scheme cannot take, such as a port
+  // on `file:`. Scheme, hostname and port are then set one by one, because
+  // the `host` setter keeps an old port when the text carries none.
+  const u = new URL(model.href);
+  const scheme = checked.scheme || u.protocol;
+  let wanted;
+  try {
+    wanted = new URL(`${scheme}//${checked.host}/`);
+  } catch {
+    return reject(BAD_HOST);
+  }
+  u.protocol = scheme;
+  u.hostname = wanted.hostname;
+  u.port = wanted.port;
+  if (u.protocol !== scheme || u.hostname !== wanted.hostname || u.port !== wanted.port) return reject(BAD_HOST);
+  const userinfo = parts.filter(p => p.role === 'userinfo').map(p => p.raw).join('');
+  model.prefix = u.protocol + '//' + userinfo + u.host;
+  model.href = u.href;
   return OK;
 }
 

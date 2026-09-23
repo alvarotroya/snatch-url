@@ -4,8 +4,13 @@
   "version": "1.0.0",
   "description": "Edit the current tab's path segments and query parameters from a popup, and navigate to the result.",
   "permissions": [
-    "activeTab"
+    "activeTab",
+    "storage"
   ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
