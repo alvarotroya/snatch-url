@@ -1,0 +1,5 @@
+# no-mistakes project settings (https://github.com/kunchenguid/no-mistakes).
+# This repository has no CI workflows. Declaring that lets a no-mistakes
+# validation run treat "no checks registered" as passed instead of waiting
+# out its CI timeout.
+no_ci: true
